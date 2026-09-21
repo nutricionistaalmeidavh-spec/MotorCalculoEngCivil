@@ -1,0 +1,133 @@
+import kernelSource from "./kernel.py?raw";
+
+export type MathOperation =
+  | "graph"
+  | "roots"
+  | "differentiate"
+  | "integrate"
+  | "limit"
+  | "simplify"
+  | "factor"
+  | "expand"
+  | "solve";
+
+export interface RootResult {
+  exact: string;
+  latex: string;
+  numeric: number;
+}
+
+export interface CalculationResult {
+  operation: MathOperation;
+  input_latex: string;
+  result_latex: string;
+  result_text: string;
+  graph_js: string;
+  roots: RootResult[];
+  warnings: string[];
+}
+
+export interface CalculationRequest {
+  operation: MathOperation;
+  expression: string;
+  variable?: string;
+  target?: string;
+  direction?: "+" | "-" | "+-";
+  lower?: string;
+  upper?: string;
+}
+
+interface PyodideRuntime {
+  FS: {
+    writeFile(path: string, data: Uint8Array): void;
+  };
+  runPython(code: string): unknown;
+  runPythonAsync(code: string): Promise<unknown>;
+  globals: {
+    set(name: string, value: unknown): void;
+    delete(name: string): void;
+  };
+}
+
+interface PyodideModule {
+  loadPyodide(options: { indexURL: string }): Promise<PyodideRuntime>;
+}
+
+const PYODIDE_BASE = "/pyodide/";
+const WHEELS = [
+  "/python-packages/mpmath-1.4.1-py3-none-any.whl",
+  "/python-packages/sympy-1.14.0-py3-none-any.whl",
+] as const;
+
+let runtimePromise: Promise<PyodideRuntime> | undefined;
+
+function pythonString(value: string): string {
+  return JSON.stringify(value);
+}
+
+async function installPurePythonWheel(runtime: PyodideRuntime, url: string): Promise<void> {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Falha ao carregar pacote matemático local: ${response.status}`);
+  }
+
+  const filename = url.split("/").at(-1);
+  if (!filename) {
+    throw new Error("Nome de pacote matemático inválido.");
+  }
+
+  const wheelPath = `/tmp/${filename}`;
+  runtime.FS.writeFile(wheelPath, new Uint8Array(await response.arrayBuffer()));
+  await runtime.runPythonAsync(`
+import site
+import zipfile
+with zipfile.ZipFile(${pythonString(wheelPath)}) as archive:
+    archive.extractall(site.getsitepackages()[0])
+`);
+}
+
+async function createRuntime(): Promise<PyodideRuntime> {
+  const modulePath = `${PYODIDE_BASE}pyodide.mjs`;
+  const pyodideModule = (await import(/* @vite-ignore */ modulePath)) as PyodideModule;
+  const runtime = await pyodideModule.loadPyodide({ indexURL: PYODIDE_BASE });
+
+  for (const wheel of WHEELS) {
+    await installPurePythonWheel(runtime, wheel);
+  }
+
+  await runtime.runPythonAsync(kernelSource);
+  return runtime;
+}
+
+export function initializeMathEngine(): Promise<void> {
+  runtimePromise ??= createRuntime();
+  return runtimePromise.then(() => undefined);
+}
+
+export async function calculate(request: CalculationRequest): Promise<CalculationResult> {
+  runtimePromise ??= createRuntime();
+  const runtime = await runtimePromise;
+
+  runtime.globals.set("_op", request.operation);
+  runtime.globals.set("_expr", request.expression);
+  runtime.globals.set("_var", request.variable ?? "x");
+  runtime.globals.set("_target", request.target ?? "0");
+  runtime.globals.set("_direction", request.direction ?? "+-");
+  runtime.globals.set("_lower", request.lower ?? "");
+  runtime.globals.set("_upper", request.upper ?? "");
+
+  try {
+    const raw = await runtime.runPythonAsync(
+      "calculate_json(_op, _expr, _var, _target, _direction, _lower, _upper)",
+    );
+    return JSON.parse(String(raw)) as CalculationResult;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const cleaned = message.split("ValueError:").at(-1)?.trim() ?? message;
+    throw new Error(cleaned);
+  } finally {
+    for (const name of ["_op", "_expr", "_var", "_target", "_direction", "_lower", "_upper"]) {
+      runtime.globals.delete(name);
+    }
+  }
+}
