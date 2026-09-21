@@ -1,0 +1,165 @@
+/* Refinements for deliveries 4–7: natural input, limits, derivatives and integrals. */
+
+.mode-label {
+  margin: 18px 0 8px;
+  color: #8b95a5;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.action.active {
+  border-color: #60a5fa;
+  background: #193154;
+  box-shadow: inset 0 0 0 1px rgba(96, 165, 250, 0.24);
+}
+
+.parameter-panel {
+  display: block;
+  padding-top: 14px;
+}
+
+.parameter-group {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid #293548;
+  border-radius: 14px;
+  background: rgba(11, 18, 32, 0.55);
+}
+
+.parameter-group label {
+  display: grid;
+  gap: 6px;
+  color: #9ca3af;
+  font-size: 0.76rem;
+}
+
+.span-full {
+  grid-column: 1 / -1;
+}
+
+.parameter-presets {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-top: 2px;
+}
+
+.preset {
+  flex: 0 0 auto;
+  min-height: 36px;
+  border: 1px solid #334155;
+  border-radius: 999px;
+  padding: 6px 10px;
+  color: #cbd5e1;
+  background: #111b2d;
+  font-size: 0.74rem;
+}
+
+.preset:hover {
+  border-color: #60a5fa;
+}
+
+.parameter-help {
+  margin: 0;
+  color: #7f8a9b;
+  font-size: 0.76rem;
+  line-height: 1.45;
+}
+
+.calculate-button {
+  width: 100%;
+  min-height: 52px;
+  margin-top: 14px;
+  border: 1px solid #3b82f6;
+  border-radius: 13px;
+  color: #eff6ff;
+  background: #1d4ed8;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+
+.calculate-button:hover {
+  background: #2563eb;
+}
+
+.calculate-button:disabled {
+  opacity: 0.58;
+  cursor: progress;
+}
+
+.calculate-button.loading::after {
+  content: " …";
+}
+
+.keyboard-hint {
+  margin: 7px 0 0;
+  color: #64748b;
+  font-size: 0.7rem;
+  text-align: center;
+}
+
+.result-details {
+  display: grid;
+  gap: 9px;
+  margin-top: 14px;
+}
+
+.detail-card {
+  padding: 11px 12px;
+  border: 1px solid #293548;
+  border-radius: 12px;
+  background: rgba(11, 18, 32, 0.55);
+}
+
+.detail-label {
+  margin: 0;
+  color: #93c5fd;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.detail-math {
+  padding: 4px 0;
+  font-size: 0.94rem;
+}
+
+.detail-text {
+  display: block;
+  overflow-x: auto;
+  color: #94a3b8;
+  font-size: 0.72rem;
+}
+
+.graph-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 10px;
+}
+
+.legend-item {
+  padding: 5px 8px;
+  border: 1px solid #303a4a;
+  border-radius: 999px;
+  color: #94a3b8;
+  font-size: 0.68rem;
+}
+
+@media (max-width: 480px) {
+  .parameter-group {
+    grid-template-columns: 1fr;
+    padding: 11px;
+  }
+
+  .span-full {
+    grid-column: 1;
+  }
+
+  .calculate-button {
+    min-height: 50px;
+  }
+}

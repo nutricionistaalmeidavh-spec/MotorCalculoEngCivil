@@ -17,4 +17,18 @@ describe("normalizeMathInput", () => {
   it("converts multi-digit superscripts", () => {
     expect(normalizeMathInput("x¹² + x³")).toBe("x^12 + x^3");
   });
+
+  it("accepts simple square roots and absolute values", () => {
+    expect(normalizeMathInput("√9 + √(x+1) + |x-2|")).toBe(
+      "sqrt(9) + sqrt(x+1) + Abs(x-2)",
+    );
+  });
+
+  it("accepts common unicode fractions and mathematical e", () => {
+    expect(normalizeMathInput("½x + e^x")).toBe("(1/2)x + E^x");
+  });
+
+  it("normalizes grouping brackets", () => {
+    expect(normalizeMathInput("[x+1]² + {x-1}")).toBe("(x+1)^2 + (x-1)");
+  });
 });

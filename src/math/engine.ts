@@ -17,6 +17,23 @@ export interface RootResult {
   numeric: number;
 }
 
+export interface ResultDetail {
+  label: string;
+  latex: string;
+  text: string;
+}
+
+export interface GraphOverlay {
+  kind: "derivative" | "tangent";
+  label: string;
+  js: string;
+}
+
+export interface IntegralRegion {
+  lower: number;
+  upper: number;
+}
+
 export interface CalculationResult {
   operation: MathOperation;
   input_latex: string;
@@ -25,6 +42,9 @@ export interface CalculationResult {
   graph_js: string;
   roots: RootResult[];
   warnings: string[];
+  details: ResultDetail[];
+  graph_overlays: GraphOverlay[];
+  integral_region: IntegralRegion | null;
 }
 
 export interface CalculationRequest {
@@ -35,6 +55,8 @@ export interface CalculationRequest {
   direction?: "+" | "-" | "+-";
   lower?: string;
   upper?: string;
+  derivativeOrder?: number;
+  tangentPoint?: string;
 }
 
 interface PyodideRuntime {
@@ -115,10 +137,12 @@ export async function calculate(request: CalculationRequest): Promise<Calculatio
   runtime.globals.set("_direction", request.direction ?? "+-");
   runtime.globals.set("_lower", request.lower ?? "");
   runtime.globals.set("_upper", request.upper ?? "");
+  runtime.globals.set("_derivative_order", request.derivativeOrder ?? 1);
+  runtime.globals.set("_tangent_point", request.tangentPoint ?? "");
 
   try {
     const raw = await runtime.runPythonAsync(
-      "calculate_json(_op, _expr, _var, _target, _direction, _lower, _upper)",
+      "calculate_json(_op, _expr, _var, _target, _direction, _lower, _upper, _derivative_order, _tangent_point)",
     );
     return JSON.parse(String(raw)) as CalculationResult;
   } catch (error) {
@@ -126,7 +150,17 @@ export async function calculate(request: CalculationRequest): Promise<Calculatio
     const cleaned = message.split("ValueError:").at(-1)?.trim() ?? message;
     throw new Error(cleaned);
   } finally {
-    for (const name of ["_op", "_expr", "_var", "_target", "_direction", "_lower", "_upper"]) {
+    for (const name of [
+      "_op",
+      "_expr",
+      "_var",
+      "_target",
+      "_direction",
+      "_lower",
+      "_upper",
+      "_derivative_order",
+      "_tangent_point",
+    ]) {
       runtime.globals.delete(name);
     }
   }

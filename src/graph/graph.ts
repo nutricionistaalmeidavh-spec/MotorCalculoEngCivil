@@ -1,5 +1,5 @@
 import JXG from "jsxgraph";
-import type { RootResult } from "../math/engine";
+import type { CalculationResult, GraphOverlay, RootResult } from "../math/engine";
 
 let board: any;
 let plottedObjects: any[] = [];
@@ -27,31 +27,37 @@ function clearPlot(): void {
   plottedObjects = [];
 }
 
-export function plotFunction(jsExpression: string, roots: RootResult[]): void {
-  const activeBoard = ensureBoard();
-  clearPlot();
-
-  if (!jsExpression) {
-    activeBoard.update();
-    return;
-  }
-
-  const evaluator = new Function(
+function createEvaluator(jsExpression: string): (x: number) => number {
+  return new Function(
     "x",
     `"use strict"; const value = (${jsExpression}); return Number.isFinite(value) ? value : NaN;`,
   ) as (x: number) => number;
+}
 
-  const curve = activeBoard.create("functiongraph", [
-    (x: number) => {
-      try {
-        return evaluator(x);
-      } catch {
-        return Number.NaN;
-      }
-    },
-  ]);
+function safeEvaluate(evaluator: (x: number) => number, x: number): number {
+  try {
+    return evaluator(x);
+  } catch {
+    return Number.NaN;
+  }
+}
+
+function addFunctionGraph(
+  activeBoard: any,
+  jsExpression: string,
+  attributes: Record<string, unknown> = {},
+): { curve: any; evaluator: (x: number) => number } {
+  const evaluator = createEvaluator(jsExpression);
+  const curve = activeBoard.create(
+    "functiongraph",
+    [(x: number) => safeEvaluate(evaluator, x)],
+    attributes,
+  );
   plottedObjects.push(curve);
+  return { curve, evaluator };
+}
 
+function addRoots(activeBoard: any, roots: RootResult[]): void {
   for (const root of roots.slice(0, 12)) {
     const point = activeBoard.create("point", [root.numeric, 0], {
       name: root.exact,
@@ -60,8 +66,88 @@ export function plotFunction(jsExpression: string, roots: RootResult[]): void {
     });
     plottedObjects.push(point);
   }
+}
 
-  activeBoard.update();
+function addOverlay(activeBoard: any, overlay: GraphOverlay): void {
+  const attributes =
+    overlay.kind === "derivative"
+      ? { dash: 2, strokeWidth: 2 }
+      : { dash: 1, strokeWidth: 2 };
+
+  addFunctionGraph(activeBoard, overlay.js, attributes);
+}
+
+function addIntegralRegion(
+  activeBoard: any,
+  evaluator: (x: number) => number,
+  lower: number,
+  upper: number,
+): void {
+  if (!Number.isFinite(lower) || !Number.isFinite(upper) || lower === upper) return;
+
+  const samples = 72;
+  const xs: number[] = [lower];
+  const ys: number[] = [0];
+  let valid = true;
+
+  for (let index = 0; index <= samples; index += 1) {
+    const x = lower + ((upper - lower) * index) / samples;
+    const y = safeEvaluate(evaluator, x);
+    if (!Number.isFinite(y)) {
+      valid = false;
+      break;
+    }
+    xs.push(x);
+    ys.push(y);
+  }
+
+  if (!valid) return;
+
+  xs.push(upper);
+  ys.push(0);
+
+  const region = activeBoard.create("curve", [xs, ys], {
+    strokeOpacity: 0,
+    fillOpacity: 0.18,
+    fillColor: "#60a5fa",
+    fixed: true,
+    highlight: false,
+  });
+  plottedObjects.push(region);
+}
+
+export function plotCalculation(result: CalculationResult): void {
+  const activeBoard = ensureBoard();
+  clearPlot();
+
+  if (!result.graph_js) {
+    activeBoard.update();
+    return;
+  }
+
+  activeBoard.suspendUpdate();
+  try {
+    const { evaluator } = addFunctionGraph(activeBoard, result.graph_js, {
+      strokeWidth: 2.5,
+    });
+
+    if (result.integral_region) {
+      addIntegralRegion(
+        activeBoard,
+        evaluator,
+        result.integral_region.lower,
+        result.integral_region.upper,
+      );
+    }
+
+    for (const overlay of result.graph_overlays) {
+      addOverlay(activeBoard, overlay);
+    }
+
+    addRoots(activeBoard, result.roots);
+  } finally {
+    activeBoard.unsuspendUpdate();
+  }
 }
 
 export function initializeGraph(): void {

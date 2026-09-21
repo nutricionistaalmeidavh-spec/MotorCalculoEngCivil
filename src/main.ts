@@ -1,11 +1,13 @@
 import katex from "katex";
 import "katex/dist/katex.min.css";
 import "./styles.css";
-import { initializeGraph, plotFunction } from "./graph/graph";
+import "./round2.css";
+import { initializeGraph, plotCalculation } from "./graph/graph";
 import {
   calculate,
   initializeMathEngine,
   type CalculationRequest,
+  type CalculationResult,
   type MathOperation,
 } from "./math/engine";
 import { normalizeMathInput } from "./math/normalize";
@@ -21,6 +23,10 @@ const ACTIONS: Array<{ operation: MathOperation; label: string }> = [
   { operation: "expand", label: "Expandir" },
   { operation: "solve", label: "Resolver" },
 ];
+
+const OPERATION_LABELS = Object.fromEntries(
+  ACTIONS.map(({ operation, label }) => [operation, label]),
+) as Record<MathOperation, string>;
 
 const app = document.querySelector<HTMLDivElement>("#app");
 if (!app) throw new Error("Elemento #app não encontrado.");
@@ -49,39 +55,78 @@ app.innerHTML = `
 
       <label class="sr-only" for="expression">Expressão matemática</label>
       <textarea id="expression" rows="2" spellcheck="false" autocomplete="off">x² - 4x + 3</textarea>
-      <p class="hint">Aceita exemplos como <code>sen(x)</code>, <code>x²</code>, <code>sqrt(x)</code>, <code>f(x)=...</code> e equações com <code>=</code>.</p>
+      <p class="hint">
+        Pode escrever como no caderno: <code>x²</code>, <code>√x</code>, <code>|x|</code>,
+        <code>½x</code>, <code>sen(x)</code>, <code>π</code>, <code>e^x</code> ou <code>f(x)=...</code>.
+      </p>
 
       <div class="examples" aria-label="Exemplos rápidos">
-        <button type="button" class="example" data-expression="x² - 4x + 3">Quadrática</button>
-        <button type="button" class="example" data-expression="(x² - 4)/(x - 2)">Limite clássico</button>
-        <button type="button" class="example" data-expression="x³ - 6x² + 9x">Cúbica</button>
-        <button type="button" class="example" data-expression="sin(x)/x">Trigonométrica</button>
+        <button type="button" class="example" data-operation="graph" data-expression="x² - 4x + 3">Quadrática</button>
+        <button type="button" class="example" data-operation="limit" data-expression="(x² - 4)/(x - 2)" data-target="2">Limite clássico</button>
+        <button type="button" class="example" data-operation="differentiate" data-expression="x³ - 6x² + 9x">Derivada</button>
+        <button type="button" class="example" data-operation="integrate" data-expression="sen(x)" data-lower="0" data-upper="π">Integral 0 → π</button>
+      </div>
+
+      <p class="mode-label">Escolha a operação</p>
+      <div class="actions" aria-label="Operações matemáticas">
+        ${ACTIONS.map(
+          ({ operation, label }, index) =>
+            `<button type="button" class="action${index === 0 ? " active" : ""}" data-operation="${operation}" aria-pressed="${index === 0}">${label}</button>`,
+        ).join("")}
       </div>
 
       <div id="parameter-panel" class="parameter-panel" hidden>
-        <label id="limit-target-field">Tende a
-          <input id="limit-target" value="0" placeholder="0, 2, oo, -oo" />
-        </label>
-        <label id="limit-direction-field">Direção
-          <select id="limit-direction">
-            <option value="+-">Dos dois lados</option>
-            <option value="-">Pela esquerda</option>
-            <option value="+">Pela direita</option>
-          </select>
-        </label>
-        <label id="lower-field">De
-          <input id="lower-bound" placeholder="opcional" />
-        </label>
-        <label id="upper-field">Até
-          <input id="upper-bound" placeholder="opcional" />
-        </label>
+        <div id="limit-parameters" class="parameter-group" hidden>
+          <label>Tende a
+            <input id="limit-target" value="0" placeholder="0, 2, π, ∞, -∞" />
+          </label>
+          <label>Direção
+            <select id="limit-direction">
+              <option value="+-">Dos dois lados</option>
+              <option value="-">Pela esquerda</option>
+              <option value="+">Pela direita</option>
+            </select>
+          </label>
+          <div class="parameter-presets span-full" aria-label="Atalhos para ponto do limite">
+            <button type="button" class="preset limit-preset" data-target="0">x → 0</button>
+            <button type="button" class="preset limit-preset" data-target="∞">x → ∞</button>
+            <button type="button" class="preset limit-preset" data-target="-∞">x → -∞</button>
+          </div>
+        </div>
+
+        <div id="derivative-parameters" class="parameter-group" hidden>
+          <label>Ordem
+            <select id="derivative-order">
+              <option value="1">1ª derivada</option>
+              <option value="2">2ª derivada</option>
+              <option value="3">3ª derivada</option>
+              <option value="4">4ª derivada</option>
+              <option value="5">5ª derivada</option>
+            </select>
+          </label>
+          <label>Ponto para reta tangente
+            <input id="tangent-point" placeholder="opcional: 0, 2, π..." />
+          </label>
+          <p class="parameter-help span-full">Se informar um ponto, o sistema calcula e desenha a reta tangente à função original.</p>
+        </div>
+
+        <div id="integral-parameters" class="parameter-group" hidden>
+          <label>Limite inferior
+            <input id="lower-bound" placeholder="vazio = indefinida" />
+          </label>
+          <label>Limite superior
+            <input id="upper-bound" placeholder="vazio = indefinida" />
+          </label>
+          <div class="parameter-presets span-full" aria-label="Atalhos para integral">
+            <button type="button" class="preset integral-preset" data-lower="" data-upper="">Indefinida</button>
+            <button type="button" class="preset integral-preset" data-lower="0" data-upper="1">0 → 1</button>
+            <button type="button" class="preset integral-preset" data-lower="0" data-upper="π">0 → π</button>
+          </div>
+        </div>
       </div>
 
-      <div class="actions" aria-label="Operações matemáticas">
-        ${ACTIONS.map(
-          ({ operation, label }) => `<button type="button" class="action" data-operation="${operation}">${label}</button>`,
-        ).join("")}
-      </div>
+      <button id="calculate-button" type="button" class="calculate-button">Calcular gráfico</button>
+      <p class="keyboard-hint">Atalho: Ctrl/⌘ + Enter</p>
     </section>
 
     <div class="workspace">
@@ -89,13 +134,14 @@ app.innerHTML = `
         <div class="section-heading compact">
           <div><p class="step">02</p><h2 id="result-title">Resultado</h2></div>
         </div>
-        <div id="result-empty" class="empty-state">Escolha uma operação para calcular.</div>
+        <div id="result-empty" class="empty-state">Escolha uma operação e toque em Calcular.</div>
         <div id="result-content" hidden>
           <p class="result-label">Entrada</p>
           <div id="input-math" class="math-output"></div>
           <p class="result-label">Resultado</p>
           <div id="result-math" class="math-output result-primary"></div>
           <pre id="result-text" class="result-text"></pre>
+          <div id="result-details" class="result-details" hidden></div>
           <div id="warnings" class="warnings" hidden></div>
         </div>
         <div id="error" class="error" role="alert" hidden></div>
@@ -107,6 +153,7 @@ app.innerHTML = `
           <span class="touch-hint">arraste · pinça para zoom</span>
         </div>
         <div id="graph" class="jxgbox" aria-label="Gráfico cartesiano interativo"></div>
+        <div id="graph-legend" class="graph-legend" aria-live="polite"></div>
       </section>
     </div>
   </main>
@@ -120,35 +167,70 @@ const resultContent = mustGet<HTMLDivElement>("result-content");
 const inputMath = mustGet<HTMLDivElement>("input-math");
 const resultMath = mustGet<HTMLDivElement>("result-math");
 const resultText = mustGet<HTMLPreElement>("result-text");
+const resultDetails = mustGet<HTMLDivElement>("result-details");
 const warnings = mustGet<HTMLDivElement>("warnings");
 const errorEl = mustGet<HTMLDivElement>("error");
 const parameterPanel = mustGet<HTMLDivElement>("parameter-panel");
-const limitTargetField = mustGet<HTMLElement>("limit-target-field");
-const limitDirectionField = mustGet<HTMLElement>("limit-direction-field");
-const lowerField = mustGet<HTMLElement>("lower-field");
-const upperField = mustGet<HTMLElement>("upper-field");
+const limitParameters = mustGet<HTMLDivElement>("limit-parameters");
+const derivativeParameters = mustGet<HTMLDivElement>("derivative-parameters");
+const integralParameters = mustGet<HTMLDivElement>("integral-parameters");
 const limitTarget = mustGet<HTMLInputElement>("limit-target");
 const limitDirection = mustGet<HTMLSelectElement>("limit-direction");
+const derivativeOrder = mustGet<HTMLSelectElement>("derivative-order");
+const tangentPoint = mustGet<HTMLInputElement>("tangent-point");
 const lowerBound = mustGet<HTMLInputElement>("lower-bound");
 const upperBound = mustGet<HTMLInputElement>("upper-bound");
+const calculateButton = mustGet<HTMLButtonElement>("calculate-button");
+const graphLegend = mustGet<HTMLDivElement>("graph-legend");
+
+let selectedOperation: MathOperation = "graph";
 
 initializeGraph();
+configureParameters(selectedOperation);
 void bootEngine();
 
 for (const button of document.querySelectorAll<HTMLButtonElement>(".example")) {
   button.addEventListener("click", () => {
     expressionInput.value = button.dataset.expression ?? "";
+    if (button.dataset.target !== undefined) limitTarget.value = button.dataset.target;
+    if (button.dataset.lower !== undefined) lowerBound.value = button.dataset.lower;
+    if (button.dataset.upper !== undefined) upperBound.value = button.dataset.upper;
+
+    const operation = button.dataset.operation as MathOperation | undefined;
+    if (operation) selectOperation(operation);
     expressionInput.focus();
   });
 }
 
 for (const button of document.querySelectorAll<HTMLButtonElement>(".action")) {
-  button.addEventListener("click", async () => {
-    const operation = button.dataset.operation as MathOperation;
-    configureParameters(operation);
-    await runCalculation(operation, button);
+  button.addEventListener("click", () => {
+    selectOperation(button.dataset.operation as MathOperation);
   });
 }
+
+for (const button of document.querySelectorAll<HTMLButtonElement>(".limit-preset")) {
+  button.addEventListener("click", () => {
+    limitTarget.value = button.dataset.target ?? "0";
+  });
+}
+
+for (const button of document.querySelectorAll<HTMLButtonElement>(".integral-preset")) {
+  button.addEventListener("click", () => {
+    lowerBound.value = button.dataset.lower ?? "";
+    upperBound.value = button.dataset.upper ?? "";
+  });
+}
+
+calculateButton.addEventListener("click", () => {
+  void runCalculation();
+});
+
+expressionInput.addEventListener("keydown", (event) => {
+  if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
+    event.preventDefault();
+    void runCalculation();
+  }
+});
 
 function mustGet<T extends HTMLElement>(id: string): T {
   const element = document.getElementById(id);
@@ -168,17 +250,29 @@ async function bootEngine(): Promise<void> {
   }
 }
 
-function configureParameters(operation: MathOperation): void {
-  const isLimit = operation === "limit";
-  const isIntegral = operation === "integrate";
-  parameterPanel.hidden = !(isLimit || isIntegral);
-  limitTargetField.hidden = !isLimit;
-  limitDirectionField.hidden = !isLimit;
-  lowerField.hidden = !isIntegral;
-  upperField.hidden = !isIntegral;
+function selectOperation(operation: MathOperation): void {
+  selectedOperation = operation;
+  for (const button of document.querySelectorAll<HTMLButtonElement>(".action")) {
+    const active = button.dataset.operation === operation;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-pressed", String(active));
+  }
+  configureParameters(operation);
+  calculateButton.textContent = `Calcular ${OPERATION_LABELS[operation].toLowerCase()}`;
 }
 
-async function runCalculation(operation: MathOperation, button: HTMLButtonElement): Promise<void> {
+function configureParameters(operation: MathOperation): void {
+  const showLimit = operation === "limit";
+  const showDerivative = operation === "differentiate";
+  const showIntegral = operation === "integrate";
+
+  parameterPanel.hidden = !(showLimit || showDerivative || showIntegral);
+  limitParameters.hidden = !showLimit;
+  derivativeParameters.hidden = !showDerivative;
+  integralParameters.hidden = !showIntegral;
+}
+
+async function runCalculation(): Promise<void> {
   const expression = normalizeMathInput(expressionInput.value);
   if (!expression) {
     showError(new Error("Digite uma expressão antes de calcular."));
@@ -186,41 +280,87 @@ async function runCalculation(operation: MathOperation, button: HTMLButtonElemen
   }
 
   clearError();
-  setBusy(true, button);
+  setBusy(true);
 
   const request: CalculationRequest = {
-    operation,
+    operation: selectedOperation,
     expression,
     variable: variableInput.value.trim() || "x",
   };
 
-  if (operation === "limit") {
+  if (selectedOperation === "limit") {
     request.target = normalizeMathInput(limitTarget.value);
     request.direction = limitDirection.value as "+" | "-" | "+-";
   }
 
-  if (operation === "integrate") {
+  if (selectedOperation === "differentiate") {
+    request.derivativeOrder = Number.parseInt(derivativeOrder.value, 10);
+    request.tangentPoint = normalizeMathInput(tangentPoint.value);
+  }
+
+  if (selectedOperation === "integrate") {
     request.lower = normalizeMathInput(lowerBound.value);
     request.upper = normalizeMathInput(upperBound.value);
   }
 
   try {
     const result = await calculate(request);
-    resultEmpty.hidden = true;
-    resultContent.hidden = false;
-
-    renderMath(inputMath, result.input_latex);
-    renderMath(resultMath, result.result_latex || "\\text{sem resultado}");
-    resultText.textContent = result.result_text;
-
-    warnings.hidden = result.warnings.length === 0;
-    warnings.textContent = result.warnings.join(" ");
-
-    plotFunction(result.graph_js, result.roots);
+    renderResult(result);
+    plotCalculation(result);
+    renderGraphLegend(result);
   } catch (error) {
     showError(error);
   } finally {
-    setBusy(false, button);
+    setBusy(false);
+  }
+}
+
+function renderResult(result: CalculationResult): void {
+  resultEmpty.hidden = true;
+  resultContent.hidden = false;
+
+  renderMath(inputMath, result.input_latex);
+  renderMath(resultMath, result.result_latex || "\\text{sem resultado}");
+  resultText.textContent = result.result_text;
+
+  resultDetails.replaceChildren();
+  for (const detail of result.details) {
+    const card = document.createElement("div");
+    card.className = "detail-card";
+
+    const label = document.createElement("p");
+    label.className = "detail-label";
+    label.textContent = detail.label;
+
+    const math = document.createElement("div");
+    math.className = "math-output detail-math";
+    renderMath(math, detail.latex);
+
+    const text = document.createElement("code");
+    text.className = "detail-text";
+    text.textContent = detail.text;
+
+    card.append(label, math, text);
+    resultDetails.append(card);
+  }
+  resultDetails.hidden = result.details.length === 0;
+
+  warnings.hidden = result.warnings.length === 0;
+  warnings.textContent = result.warnings.join(" ");
+}
+
+function renderGraphLegend(result: CalculationResult): void {
+  graphLegend.replaceChildren();
+
+  const labels = result.graph_js ? ["Função original"] : [];
+  labels.push(...result.graph_overlays.map((overlay) => overlay.label));
+  if (result.integral_region) labels.push("Intervalo da integral");
+
+  for (const labelText of labels) {
+    const item = document.createElement("span");
+    item.className = "legend-item";
+    item.textContent = labelText;
+    graphLegend.append(item);
   }
 }
 
@@ -232,13 +372,15 @@ function renderMath(target: HTMLElement, latex: string): void {
   });
 }
 
-function setBusy(busy: boolean, activeButton: HTMLButtonElement): void {
-  for (const button of document.querySelectorAll<HTMLButtonElement>(".action")) {
+function setBusy(busy: boolean): void {
+  for (const button of document.querySelectorAll<HTMLButtonElement>(
+    ".action, .example, .preset, #calculate-button",
+  )) {
     button.disabled = busy;
   }
-  activeButton.classList.toggle("loading", busy);
-  if (busy) activeButton.setAttribute("aria-busy", "true");
-  else activeButton.removeAttribute("aria-busy");
+  calculateButton.classList.toggle("loading", busy);
+  if (busy) calculateButton.setAttribute("aria-busy", "true");
+  else calculateButton.removeAttribute("aria-busy");
 }
 
 function showError(error: unknown): void {

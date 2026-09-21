@@ -36,6 +36,7 @@ SAFE_FUNCTIONS = {
     "abs": sp.Abs,
     "pi": sp.pi,
     "E": sp.E,
+    "e": sp.E,
     "oo": sp.oo,
 }
 
@@ -76,6 +77,14 @@ def _parse_scalar(text: str, variables: set[str]):
         transformations=TRANSFORMATIONS,
         evaluate=True,
     )
+
+
+def _parse_constant(text: str, label: str, variable: str | None = None):
+    variables = {variable} if variable else set()
+    value = _parse_scalar(text, variables)
+    if value.free_symbols:
+        raise ValueError(f"{label} deve ser um valor constante.")
+    return value
 
 
 def _parse_expression(text: str, variable: str):
@@ -126,7 +135,31 @@ def _parse_target(target: str, variable: str):
         return sp.oo
     if normalized == "-oo":
         return -sp.oo
-    return _parse_scalar(normalized, {variable})
+    return _parse_constant(normalized, "O ponto do limite", variable)
+
+
+def _to_js(expr):
+    try:
+        return jscode(expr)
+    except Exception:
+        return ""
+
+
+def _detail(label: str, value, *, latex_prefix: str = ""):
+    return {
+        "label": label,
+        "latex": latex_prefix + sp.latex(value),
+        "text": str(value),
+    }
+
+
+def _finite_float(value):
+    if value.is_real is not True or value.is_finite is not True:
+        return None
+    try:
+        return float(sp.N(value, 12))
+    except (TypeError, ValueError):
+        return None
 
 
 def calculate_json(
@@ -137,6 +170,8 @@ def calculate_json(
     direction: str = "+-",
     lower: str = "",
     upper: str = "",
+    derivative_order: int = 1,
+    tangent_point: str = "",
 ) -> str:
     variable = variable.strip() or "x"
     if not re.fullmatch(r"[A-Za-z]", variable):
@@ -152,60 +187,151 @@ def calculate_json(
         "input_latex": sp.latex(parsed),
         "result_latex": "",
         "result_text": "",
-        "graph_js": "",
+        "graph_js": _to_js(expr),
         "roots": roots,
         "warnings": [],
+        "details": [],
+        "graph_overlays": [],
+        "integral_region": None,
     }
 
-    try:
-        payload["graph_js"] = jscode(expr)
-    except Exception:
+    if not payload["graph_js"]:
         payload["warnings"].append("Esta expressão não pôde ser convertida para o gráfico interativo.")
 
     if operation == "graph":
         result = expr
         payload["result_latex"] = sp.latex(result)
         payload["result_text"] = str(result)
+
     elif operation == "roots":
         result = sp.solve(sp.Eq(expr, 0), symbol)
         payload["result_latex"] = _latex_list(result)
         payload["result_text"] = str(result)
+
     elif operation == "differentiate":
-        result = sp.diff(expr, symbol)
+        try:
+            order = int(derivative_order)
+        except (TypeError, ValueError):
+            raise ValueError("A ordem da derivada deve ser um número inteiro.")
+        if order < 1 or order > 5:
+            raise ValueError("Escolha uma ordem de derivada entre 1 e 5.")
+
+        result = sp.diff(expr, symbol, order)
         payload["result_latex"] = sp.latex(result)
         payload["result_text"] = str(result)
+
+        derivative_js = _to_js(result)
+        if derivative_js:
+            payload["graph_overlays"].append({
+                "kind": "derivative",
+                "label": f"{order}ª derivada" if order > 1 else "Derivada",
+                "js": derivative_js,
+            })
+
+        if tangent_point.strip():
+            point = _parse_constant(tangent_point, "O ponto da tangente", variable)
+            point_numeric = _finite_float(point)
+            if point_numeric is None:
+                raise ValueError("O ponto da tangente deve ser um número real e finito.")
+
+            y_value = sp.simplify(expr.subs(symbol, point))
+            slope = sp.simplify(sp.diff(expr, symbol).subs(symbol, point))
+            if _finite_float(y_value) is None or _finite_float(slope) is None:
+                raise ValueError("A função ou sua derivada não é finita no ponto informado.")
+
+            tangent = sp.expand(y_value + slope * (symbol - point))
+            payload["details"].append(_detail(
+                f"Reta tangente em {variable} = {point}",
+                tangent,
+                latex_prefix="y = ",
+            ))
+            payload["details"].append(_detail("Inclinação da tangente", slope))
+
+            tangent_js = _to_js(tangent)
+            if tangent_js:
+                payload["graph_overlays"].append({
+                    "kind": "tangent",
+                    "label": "Reta tangente",
+                    "js": tangent_js,
+                })
+
     elif operation == "integrate":
         if bool(lower.strip()) != bool(upper.strip()):
             raise ValueError("Informe os dois limites da integral definida ou deixe ambos vazios.")
+
         if lower.strip() and upper.strip():
-            lo = _parse_scalar(lower, {variable})
-            hi = _parse_scalar(upper, {variable})
+            lo = _parse_constant(lower, "O limite inferior", variable)
+            hi = _parse_constant(upper, "O limite superior", variable)
             result = sp.integrate(expr, (symbol, lo, hi))
             payload["result_latex"] = sp.latex(result)
             payload["result_text"] = str(result)
+
+            approximate = sp.N(result, 10)
+            if not result.free_symbols and result.is_Rational is not True:
+                payload["details"].append(_detail("Valor aproximado", approximate))
+
+            lo_numeric = _finite_float(lo)
+            hi_numeric = _finite_float(hi)
+            if lo_numeric is not None and hi_numeric is not None:
+                payload["integral_region"] = {
+                    "lower": min(lo_numeric, hi_numeric),
+                    "upper": max(lo_numeric, hi_numeric),
+                }
+            else:
+                payload["warnings"].append(
+                    "O resultado foi calculado, mas o intervalo não pode ser sombreado no gráfico."
+                )
         else:
             result = sp.integrate(expr, symbol)
             payload["result_latex"] = sp.latex(result) + r" + C"
             payload["result_text"] = f"{result} + C"
+
     elif operation == "limit":
         if direction not in {"+", "-", "+-"}:
             raise ValueError("Direção de limite inválida.")
+
         point = _parse_target(target, variable)
-        result = sp.limit(expr, symbol, point, dir=direction)
-        payload["result_latex"] = sp.latex(result)
-        payload["result_text"] = str(result)
+        if point in {sp.oo, -sp.oo}:
+            result = sp.limit(expr, symbol, point)
+            payload["result_latex"] = sp.latex(result)
+            payload["result_text"] = str(result)
+        elif direction == "+-":
+            left = sp.limit(expr, symbol, point, dir="-")
+            right = sp.limit(expr, symbol, point, dir="+")
+            payload["details"] = [
+                _detail("Limite pela esquerda", left),
+                _detail("Limite pela direita", right),
+            ]
+            if left == right:
+                result = left
+                payload["result_latex"] = sp.latex(result)
+                payload["result_text"] = str(result)
+            else:
+                payload["result_latex"] = r"\text{não existe}"
+                payload["result_text"] = "não existe"
+                payload["warnings"].append(
+                    "Os limites laterais são diferentes; portanto, o limite bilateral não existe."
+                )
+        else:
+            result = sp.limit(expr, symbol, point, dir=direction)
+            payload["result_latex"] = sp.latex(result)
+            payload["result_text"] = str(result)
+
     elif operation == "simplify":
         result = sp.simplify(expr)
         payload["result_latex"] = sp.latex(result)
         payload["result_text"] = str(result)
+
     elif operation == "factor":
         result = sp.factor(expr)
         payload["result_latex"] = sp.latex(result)
         payload["result_text"] = str(result)
+
     elif operation == "expand":
         result = sp.expand(expr)
         payload["result_latex"] = sp.latex(result)
         payload["result_text"] = str(result)
+
     elif operation == "solve":
         if isinstance(parsed, sp.Equality):
             result = sp.solve(parsed, symbol)
@@ -213,6 +339,7 @@ def calculate_json(
             result = sp.solve(sp.Eq(expr, 0), symbol)
         payload["result_latex"] = _latex_list(result)
         payload["result_text"] = str(result)
+
     else:
         raise ValueError("Operação não suportada.")
 
