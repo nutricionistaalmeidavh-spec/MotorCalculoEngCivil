@@ -6,6 +6,8 @@ import { fileURLToPath } from "node:url";
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const pyodideSource = join(root, "node_modules", "pyodide");
 const pyodideTarget = join(root, "public", "pyodide");
+const jsxgraphCssSource = join(root, "node_modules", "jsxgraph", "distrib", "jsxgraph.css");
+const vendorTarget = join(root, "public", "vendor");
 const wheelsTarget = join(root, "public", "python-packages");
 
 const packages = [
@@ -22,14 +24,20 @@ async function exists(path) {
   }
 }
 
-async function preparePyodide() {
+async function prepareStaticRuntime() {
   if (!(await exists(join(pyodideSource, "pyodide.mjs")))) {
     throw new Error("Pacote pyodide não encontrado. Execute npm install primeiro.");
+  }
+  if (!(await exists(jsxgraphCssSource))) {
+    throw new Error("CSS do JSXGraph não encontrado. Execute npm install primeiro.");
   }
 
   await rm(pyodideTarget, { recursive: true, force: true });
   await mkdir(dirname(pyodideTarget), { recursive: true });
   await cp(pyodideSource, pyodideTarget, { recursive: true });
+
+  await mkdir(vendorTarget, { recursive: true });
+  await cp(jsxgraphCssSource, join(vendorTarget, "jsxgraph.css"));
 }
 
 async function sha256(buffer) {
@@ -70,7 +78,7 @@ async function downloadWheel({ name, version }) {
   await writeFile(destination, buffer);
 }
 
-await preparePyodide();
+await prepareStaticRuntime();
 await mkdir(wheelsTarget, { recursive: true });
 for (const pkg of packages) {
   await downloadWheel(pkg);

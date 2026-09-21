@@ -1,5 +1,4 @@
 import JXG from "jsxgraph";
-import "jsxgraph/distrib/jsxgraph.css";
 import type { RootResult } from "../math/engine";
 
 let board: any;
