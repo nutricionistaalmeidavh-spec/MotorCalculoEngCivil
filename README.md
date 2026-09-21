@@ -1,17 +1,22 @@
 # MotorCalculoEngCivil
 
-MVP mobile-first para estudo de Cálculo 1 em Engenharia Civil.
+Aplicação mobile-first para estudo de Cálculo 1 em Engenharia Civil.
 
 ## Entregas implementadas
 
 1. **MVP matemático:** raízes, derivada, integral, limite, simplificação, fatoração, expansão e resolução de equações com SymPy.
-2. **Gráfico interativo:** JSXGraph com pan, zoom/pinch e marcação de raízes reais finitas.
-3. **Interface mobile:** layout responsivo pensado primeiro para celular, com entrada amigável (`x²`, `sen(x)`, `π`, `∞`) e resultados em KaTeX.
+2. **Gráfico interativo:** JSXGraph com pan, zoom/pinch e marcação segura de raízes reais finitas.
+3. **Interface mobile:** layout responsivo pensado primeiro para celular e resultados matemáticos em KaTeX.
+4. **Entrada matemática amigável:** aceita notação como `x²`, `√x`, `|x|`, `½x`, `sen(x)`, `π`, `∞`, `e^x`, colchetes/chaves e atribuições como `f(x)=...`.
+5. **Limites:** bilateral, esquerda, direita e infinito; no limite bilateral o sistema compara os dois lados e informa quando o limite não existe.
+6. **Derivadas:** ordens de 1 a 5, gráfico da derivada e reta tangente opcional em um ponto.
+7. **Integrais:** indefinidas e definidas; integrais definidas mostram aproximação quando útil e sombreiam o intervalo no gráfico quando os limites são reais e finitos.
 
 ## Stack
 
 - Vite + TypeScript
 - SymPy 1.14.0 executando em Pyodide 314.0.7
+- mpmath 1.3.0
 - JSXGraph 1.13.3
 - KaTeX 0.18.7
 - Vitest + `unittest`
@@ -33,7 +38,7 @@ O `postinstall` prepara os assets locais do runtime matemático.
 
 ```bash
 npm test
-python -m pip install "sympy==1.14.0" "mpmath==1.4.1"
+python -m pip install "sympy==1.14.0" "mpmath==1.3.0"
 python -m unittest discover -s tests -p "test_*.py"
 npm run typecheck
 npm run build
