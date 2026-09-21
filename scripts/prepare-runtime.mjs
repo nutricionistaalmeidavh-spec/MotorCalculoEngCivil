@@ -9,7 +9,7 @@ const pyodideTarget = join(root, "public", "pyodide");
 const wheelsTarget = join(root, "public", "python-packages");
 
 const packages = [
-  { name: "mpmath", version: "1.4.1" },
+  { name: "mpmath", version: "1.3.0" },
   { name: "sympy", version: "1.14.0" },
 ];
 

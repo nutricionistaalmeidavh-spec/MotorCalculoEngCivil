@@ -55,7 +55,7 @@ interface PyodideModule {
 
 const PYODIDE_BASE = "/pyodide/";
 const WHEELS = [
-  "/python-packages/mpmath-1.4.1-py3-none-any.whl",
+  "/python-packages/mpmath-1.3.0-py3-none-any.whl",
   "/python-packages/sympy-1.14.0-py3-none-any.whl",
 ] as const;
 
