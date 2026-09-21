@@ -11,6 +11,11 @@ Aplicação mobile-first para estudo de Cálculo 1 em Engenharia Civil.
 5. **Limites:** bilateral, esquerda, direita e infinito; no limite bilateral o sistema compara os dois lados e informa quando o limite não existe.
 6. **Derivadas:** ordens de 1 a 5, gráfico da derivada e reta tangente opcional em um ponto.
 7. **Integrais:** indefinidas e definidas; integrais definidas mostram aproximação quando útil e sombreiam o intervalo no gráfico quando os limites são reais e finitos.
+8. **PWA:** manifest + Service Worker; após o primeiro uso completo, os assets usados pelo motor ficam em cache para uso com conexão ruim/offline.
+9. **Histórico local:** até 60 cálculos em IndexedDB, com reaproveitamento rápido das entradas e parâmetros.
+10. **Cloudflare Worker:** Static Assets + endpoint `/api/health`, preparado para D1 e R2 exclusivos do projeto.
+11. **Infra versionada:** `wrangler.jsonc`, migrations D1 e scripts de provisionamento/deploy.
+12. **Provisionamento automático:** cria D1/R2 próprios, aplica migrations, testa, builda e publica em `workers.dev`.
 
 ## Stack
 
@@ -19,9 +24,12 @@ Aplicação mobile-first para estudo de Cálculo 1 em Engenharia Civil.
 - mpmath 1.3.0
 - JSXGraph 1.13.3
 - KaTeX 0.18.7
+- IndexedDB
+- Cloudflare Workers + Static Assets + D1 + R2
+- Wrangler 4.135.0
 - Vitest + `unittest`
 
-O runtime de produção é **self-hosted**. O build copia o núcleo do Pyodide para `public/pyodide` e baixa wheels fixos de SymPy/mpmath para `public/python-packages`. O navegador publicado não depende de API matemática paga nem de CDN para executar cálculos.
+O motor matemático é **self-hosted no Worker/Static Assets**. O build copia o núcleo do Pyodide para `public/pyodide` e baixa wheels fixos de SymPy/mpmath para `public/python-packages`. O navegador publicado não depende de API matemática paga nem de CDN para executar cálculos.
 
 ## Desenvolvimento
 
@@ -44,6 +52,29 @@ npm run typecheck
 npm run build
 ```
 
-## Escopo atual
+## Primeiro deploy Cloudflare
 
-Ainda não inclui PWA, histórico, D1/R2, autenticação ou deploy Cloudflare. Esses itens pertencem às próximas entregas do roadmap.
+O terminal precisa estar autenticado no GitHub e na Cloudflare. O script **não reutiliza recursos desconhecidos** com o mesmo nome.
+
+```bash
+git clone https://github.com/nutricionistaalmeidavh-spec/MotorCalculoEngCivil.git
+cd MotorCalculoEngCivil
+./scripts/provision.sh
+```
+
+O provisionamento cria, na conta Cloudflare autenticada:
+
+- Worker: `motor-calculo-eng-civil`
+- D1: `motor-calculo-eng-civil-db`
+- R2: `motor-calculo-eng-civil-files`
+
+Depois do primeiro provisionamento, se o Wrangler alterar `wrangler.jsonc` com IDs dos bindings, o script mostra o comando para versionar essa alteração.
+
+## Atualizações posteriores
+
+```bash
+git pull
+./scripts/deploy.sh
+```
+
+A URL final é exibida pelo `wrangler deploy` e usa o domínio padrão `*.workers.dev`. O endpoint `/api/health` confirma que D1 e R2 estão vinculados.

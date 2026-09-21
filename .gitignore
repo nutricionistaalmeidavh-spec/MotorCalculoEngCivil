@@ -2,5 +2,6 @@ node_modules/
 dist/
 public/pyodide/
 public/python-packages/
+.wrangler/
 .DS_Store
 *.log

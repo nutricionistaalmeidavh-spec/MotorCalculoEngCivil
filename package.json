@@ -1,7 +1,7 @@
 {
   "name": "motor-calculo-eng-civil",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -9,7 +9,9 @@
     "postinstall": "npm run prepare:runtime",
     "test": "vitest run",
     "typecheck": "tsc -b --pretty false",
-    "build": "npm run prepare:runtime && npm run typecheck && vite build"
+    "build": "npm run prepare:runtime && npm run typecheck && vite build",
+    "provision": "bash scripts/provision.sh",
+    "deploy": "bash scripts/deploy.sh"
   },
   "dependencies": {
     "jsxgraph": "1.13.3",
@@ -19,6 +21,7 @@
   "devDependencies": {
     "typescript": "7.0.2",
     "vite": "8.3.0",
-    "vitest": "5.0.1"
+    "vitest": "5.0.1",
+    "wrangler": "4.135.0"
   }
 }
