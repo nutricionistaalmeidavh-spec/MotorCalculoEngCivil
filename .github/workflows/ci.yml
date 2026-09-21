@@ -35,3 +35,17 @@ jobs:
         run: npm run typecheck
       - name: Production build
         run: npm run build
+
+  windows-powershell-51:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate scripts on Windows PowerShell 5.1
+        shell: powershell
+        run: |
+          if ($PSVersionTable.PSVersion.Major -ne 5) {
+            throw "Expected Windows PowerShell 5.1, got $($PSVersionTable.PSVersion)"
+          }
+          [ScriptBlock]::Create((Get-Content -Raw 'scripts/provision.ps1')) | Out-Null
+          [ScriptBlock]::Create((Get-Content -Raw 'scripts/deploy.ps1')) | Out-Null
+          Write-Host "Windows PowerShell $($PSVersionTable.PSVersion) syntax OK"
