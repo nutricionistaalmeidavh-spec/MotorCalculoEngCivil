@@ -26,7 +26,7 @@ Aplicação mobile-first para estudo de Cálculo 1 em Engenharia Civil.
 - KaTeX 0.18.7
 - IndexedDB
 - Cloudflare Workers + Static Assets + D1 + R2
-- Wrangler 4.135.0
+- Wrangler 4
 - Vitest + `unittest`
 
 O motor matemático é **self-hosted no Worker/Static Assets**. O build copia o núcleo do Pyodide para `public/pyodide` e baixa wheels fixos de SymPy/mpmath para `public/python-packages`. O navegador publicado não depende de API matemática paga nem de CDN para executar cálculos.
@@ -52,14 +52,16 @@ npm run typecheck
 npm run build
 ```
 
-## Primeiro deploy Cloudflare
+## Primeiro deploy Cloudflare no Windows / PowerShell
+
+Este é o fluxo recomendado para o ambiente Windows usado no Termius. Não use `chmod`, `&&` ou continuação com `\` no Windows PowerShell 5.1.
 
 O terminal precisa estar autenticado no GitHub e na Cloudflare. O script **não reutiliza recursos desconhecidos** com o mesmo nome.
 
-```bash
-git clone https://github.com/nutricionistaalmeidavh-spec/MotorCalculoEngCivil.git
-cd MotorCalculoEngCivil
-./scripts/provision.sh
+```powershell
+git.exe clone https://github.com/nutricionistaalmeidavh-spec/MotorCalculoEngCivil.git
+Set-Location .\MotorCalculoEngCivil
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\provision.ps1
 ```
 
 O provisionamento cria, na conta Cloudflare autenticada:
@@ -68,12 +70,21 @@ O provisionamento cria, na conta Cloudflare autenticada:
 - D1: `motor-calculo-eng-civil-db`
 - R2: `motor-calculo-eng-civil-files`
 
-Depois do primeiro provisionamento, se o Wrangler alterar `wrangler.jsonc` com IDs dos bindings, o script mostra o comando para versionar essa alteração.
+Depois do primeiro provisionamento, se o Wrangler alterar `wrangler.jsonc` com IDs dos bindings, o script mostra o comando PowerShell para versionar essa alteração.
 
-## Atualizações posteriores
+## Atualizações posteriores no Windows / PowerShell
+
+```powershell
+git.exe pull --ff-only
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\deploy.ps1
+```
+
+## Linux / Git Bash
+
+Os scripts Bash continuam disponíveis como alternativa:
 
 ```bash
-git pull
+./scripts/provision.sh
 ./scripts/deploy.sh
 ```
 
