@@ -43,7 +43,8 @@ function Invoke-NativeChecked([string]$Label, [string]$FilePath, [string[]]$Argu
 
 function Strip-Ansi([string]$Text) {
   if ($null -eq $Text) { return '' }
-  [regex]::Replace($Text, "`e\[[0-9;?]*[ -/]*[@-~]", '')
+  $escapePattern = [string][char]27 + '\[[0-9;?]*[ -/]*[@-~]'
+  [regex]::Replace($Text, $escapePattern, '')
 }
 
 function ConvertFrom-LooseJson([string]$Text) {
@@ -119,6 +120,7 @@ Require-Command npm.cmd
 Require-Command npx.cmd
 
 $GitCmd = (Get-Command git.exe -ErrorAction Stop).Source
+$NodeCmd = (Get-Command node.exe -ErrorAction Stop).Source
 $NpmCmd = (Get-Command npm.cmd -ErrorAction Stop).Source
 $NpxCmd = (Get-Command npx.cmd -ErrorAction Stop).Source
 $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
@@ -134,7 +136,7 @@ try {
     throw 'Existem alterações Git não commitadas. Faça commit/stash antes do provisionamento.'
   }
 
-  Invoke-NativeChecked 'node --version' (Get-Command node.exe).Source @('--version') | Out-Null
+  Invoke-NativeChecked 'node --version' $NodeCmd @('--version') | Out-Null
   Invoke-NativeChecked 'npm --version' $NpmCmd @('--version') | Out-Null
   Ensure-CloudflareLogin $NpxCmd
 
