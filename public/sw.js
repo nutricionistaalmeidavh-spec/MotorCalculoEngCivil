@@ -1,10 +1,11 @@
-const CACHE_NAME = "motor-calculo-v1";
+const CACHE_NAME = "motor-calculo-2";
 const APP_SHELL = [
   "/",
   "/manifest.webmanifest",
   "/icon-192.png",
   "/icon-512.png",
   "/vendor/jsxgraph.css",
+  "/study/calculo1-demo.pdf",
   "/python-packages/mpmath-1.3.0-py3-none-any.whl",
   "/python-packages/sympy-1.14.0-py3-none-any.whl",
   "/pyodide/pyodide.mjs"

@@ -16,6 +16,23 @@ Aplicação mobile-first para estudo de Cálculo 1 em Engenharia Civil.
 10. **Cloudflare Worker:** Static Assets + endpoint `/api/health`, preparado para D1 e R2 exclusivos do projeto.
 11. **Infra versionada:** `wrangler.jsonc`, migrations D1 e scripts de provisionamento/deploy.
 12. **Provisionamento automático:** cria D1/R2 próprios, aplica migrations, testa, builda e publica em `workers.dev`.
+13. **Central de Estudos:** sete contratos Apple Utils incorporados localmente, com dashboard, PDF, anotações, mapa, busca, armazenamento e PWA aparentes e funcionais na UI.
+
+## Central de Estudos / Apple Utils
+
+O núcleo usa snapshots ESM versionados em `vendor/artisys/`, sem buscar código no repositório privado durante `npm install`, build ou deploy. A proveniência e os SHAs estão em `vendor/artisys/ORIGIN.json`.
+
+Módulos incorporados:
+
+- `artisys-dashboard`: valida os sete cards da Central de Estudos;
+- `artisys-pdf`: boundary de carregamento/normalização de PDF, consumido com PDF.js local;
+- `artisys-annotations`: normaliza anotações ligadas ao material;
+- `artisys-workflows`: valida o mapa Cálculo 1 → Funções/Limites/Continuidade/Derivadas/Integrais;
+- `artisys-search`: indexa tópicos e anotações em memória;
+- `artisys-storage`: persiste estado em IndexedDB e cai para memória quando necessário;
+- `artisys-pwa-runtime`: define o plano de cache versionado usado pelo Service Worker existente.
+
+O core permanece **R$ 0, self-hosted/open source e sem API paga obrigatória**. React, XYFlow e serviços externos não são dependências do fluxo principal.
 
 ## Stack
 
@@ -24,10 +41,11 @@ Aplicação mobile-first para estudo de Cálculo 1 em Engenharia Civil.
 - mpmath 1.3.0
 - JSXGraph 1.13.3
 - KaTeX 0.18.7
+- PDF.js (`pdfjs-dist`)
 - IndexedDB
+- Playwright + Vitest
 - Cloudflare Workers + Static Assets + D1 + R2
 - Wrangler 4
-- Vitest + `unittest`
 
 O motor matemático é **self-hosted no Worker/Static Assets**. O build copia o núcleo do Pyodide para `public/pyodide` e baixa wheels fixos de SymPy/mpmath para `public/python-packages`. O navegador publicado não depende de API matemática paga nem de CDN para executar cálculos.
 
@@ -37,12 +55,13 @@ Requisitos: Node.js 22+ e Python 3.14 para os testes do kernel.
 
 ```bash
 npm install
+npx playwright install chromium
 npm run dev
 ```
 
 O `postinstall` prepara os assets locais do runtime matemático.
 
-## Verificação
+## Verificação completa
 
 ```bash
 npm test
@@ -50,7 +69,14 @@ python -m pip install "sympy==1.14.0" "mpmath==1.3.0"
 python -m unittest discover -s tests -p "test_*.py"
 npm run typecheck
 npm run build
+npm run test:e2e
 ```
+
+Os E2E comprovam que os sete recursos estão aparentes e funcionais na UI, incluindo seleção de tópico, busca, anotação dinâmica, persistência após reload, PDF local, estado PWA e viewport mobile.
+
+## Atualização dos snapshots Apple Utils
+
+A atualização é deliberada: copie novamente apenas os sources reutilizáveis do módulo, atualize `vendor/artisys/ORIGIN.json` com versão/SHA/licença e rode a verificação completa. O produto não usa submodule nem `fetch` runtime contra `utilidades`.
 
 ## Primeiro deploy Cloudflare no Windows / PowerShell
 
@@ -72,6 +98,21 @@ O provisionamento cria, na conta Cloudflare autenticada:
 
 Depois do primeiro provisionamento, se o Wrangler alterar `wrangler.jsonc` com IDs dos bindings, o script mostra o comando PowerShell para versionar essa alteração.
 
+## Deploy desta branch antes do merge
+
+```powershell
+git.exe fetch origin
+git.exe switch feat/apple-utils-study-hub
+git.exe pull --ff-only origin feat/apple-utils-study-hub
+npm install
+npx playwright install chromium
+npm test
+npm run typecheck
+npm run build
+npm run test:e2e
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\deploy.ps1
+```
+
 ## Atualizações posteriores no Windows / PowerShell
 
 ```powershell
@@ -80,8 +121,6 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\deploy.ps1
 ```
 
 ## Linux / Git Bash
-
-Os scripts Bash continuam disponíveis como alternativa:
 
 ```bash
 ./scripts/provision.sh
