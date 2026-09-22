@@ -1,3 +1,6 @@
+export type HistoryOutcome = "practice" | "correct" | "incorrect";
+export type HistoryMode = "study" | "exam";
+
 export interface HistoryEntry {
   id: string;
   createdAt: number;
@@ -5,6 +8,9 @@ export interface HistoryEntry {
   operation: string;
   variable: string;
   resultText: string;
+  topic?: string;
+  outcome?: HistoryOutcome;
+  mode?: HistoryMode;
   target?: string;
   direction?: string;
   derivativeOrder?: number;
