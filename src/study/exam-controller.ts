@@ -25,7 +25,12 @@ export function mountExamController(variableInput: HTMLInputElement): void {
   let index = 0;
   let attempts: ExamAttempt[] = [];
   let answered = false;
-  const current = () => EXAM_QUESTIONS[index % EXAM_QUESTIONS.length];
+
+  function current(): ExamQuestion {
+    const question = EXAM_QUESTIONS[index % EXAM_QUESTIONS.length];
+    if (!question) throw new Error("Banco de questões indisponível.");
+    return question;
+  }
 
   function hintFor(question: ExamQuestion): string {
     if (question.operation === "limit") return "Verifique o comportamento da expressão perto do ponto antes de substituir diretamente.";
