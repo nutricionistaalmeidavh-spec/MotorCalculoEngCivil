@@ -41,8 +41,9 @@ function inferOperation(text: string): SupportedOperation {
 
 function extractAssignedExpression(text: string): string | undefined {
   const match = text.match(/[a-z]\s*\(\s*[a-z]\s*\)\s*=\s*(.+)$/i);
-  if (!match) return undefined;
-  return match[1]
+  const expression = match?.[1];
+  if (!expression) return undefined;
+  return expression
     .replace(/\s+(?:e\s+)?(?:encontre|calcule|determine|classifique|quando|para)\b.*$/i, '')
     .trim();
 }
