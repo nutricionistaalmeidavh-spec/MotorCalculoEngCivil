@@ -6,8 +6,10 @@ import {
   listHistory,
   type HistoryEntry,
 } from "./storage";
+import { topicForOperation, type SupportedOperation } from "../study/intent";
 
 const OPERATION_LABELS: Record<string, string> = {
+  analyze: "Análise",
   graph: "Gráfico",
   roots: "Raízes",
   differentiate: "Derivada",
@@ -21,6 +23,7 @@ const OPERATION_LABELS: Record<string, string> = {
 
 let lastSignature = "";
 let renderScheduled = false;
+let onlyErrors = false;
 
 function getInputValue(id: string): string {
   return document.getElementById(id) instanceof HTMLInputElement
@@ -37,7 +40,8 @@ function getSelectValue(id: string): string {
 function currentSnapshot(): Omit<HistoryEntry, "id" | "createdAt"> | null {
   const resultContent = document.getElementById("result-content");
   const resultText = document.getElementById("result-text")?.textContent?.trim() ?? "";
-  const expression = (document.getElementById("expression") as HTMLTextAreaElement | null)?.value.trim() ?? "";
+  const solvedExpression = (document.getElementById("expression") as HTMLTextAreaElement | null)?.dataset.solvedExpression?.trim() ?? "";
+  const expression = solvedExpression || (document.getElementById("expression") as HTMLTextAreaElement | null)?.value.trim() || "";
   const variable = getInputValue("variable") || "x";
   const activeOperation = document.querySelector<HTMLButtonElement>(".action.active")?.dataset.operation ?? "";
 
@@ -48,6 +52,9 @@ function currentSnapshot(): Omit<HistoryEntry, "id" | "createdAt"> | null {
     operation: activeOperation,
     variable,
     resultText,
+    topic: topicForOperation(activeOperation as SupportedOperation),
+    outcome: "practice",
+    mode: "study",
   };
 
   if (activeOperation === "limit") {
@@ -135,18 +142,36 @@ function restoreEntry(entry: HistoryEntry): void {
   expression?.focus();
 }
 
+function outcomeLabel(entry: HistoryEntry): string {
+  if (entry.outcome === "incorrect") return "Revisar";
+  if (entry.outcome === "correct") return "Acertou";
+  return entry.mode === "exam" ? "Prova" : "Prática";
+}
+
 async function renderHistory(): Promise<void> {
   const list = document.getElementById("history-list");
   if (!list) return;
 
   try {
-    const entries = await listHistory(30);
+    const entries = await listHistory(60);
+    const errors = entries.filter((entry) => entry.outcome === "incorrect");
+    const visibleEntries = onlyErrors ? errors : entries.slice(0, 30);
     list.replaceChildren();
-    setHistoryStatus(entries.length ? `${entries.length} cálculo(s) salvo(s) neste aparelho.` : "Nenhum cálculo salvo ainda.");
+    setHistoryStatus(
+      entries.length
+        ? `${entries.length} registro(s) · ${errors.length} para revisar neste aparelho.`
+        : "Nenhum cálculo salvo ainda.",
+    );
 
-    for (const entry of entries) {
+    const filterButton = document.getElementById("history-errors-only");
+    if (filterButton) {
+      filterButton.textContent = onlyErrors ? "Mostrar tudo" : `Revisar erros (${errors.length})`;
+      filterButton.setAttribute("aria-pressed", String(onlyErrors));
+    }
+
+    for (const entry of visibleEntries) {
       const row = document.createElement("article");
-      row.className = "history-item";
+      row.className = `history-item history-${entry.outcome ?? "practice"}`;
 
       const body = document.createElement("button");
       body.type = "button";
@@ -155,7 +180,7 @@ async function renderHistory(): Promise<void> {
 
       const heading = document.createElement("span");
       heading.className = "history-heading";
-      heading.textContent = `${OPERATION_LABELS[entry.operation] ?? entry.operation} · ${new Date(entry.createdAt).toLocaleString("pt-BR", {
+      heading.textContent = `${outcomeLabel(entry)} · ${entry.topic ?? OPERATION_LABELS[entry.operation] ?? entry.operation} · ${new Date(entry.createdAt).toLocaleString("pt-BR", {
         day: "2-digit",
         month: "2-digit",
         hour: "2-digit",
@@ -199,8 +224,11 @@ export function mountHistory(): void {
   section.className = "card history-card";
   section.innerHTML = `
     <div class="section-heading compact history-toolbar">
-      <div><p class="step">04</p><h2>Histórico neste aparelho</h2></div>
-      <button id="history-clear" type="button" class="history-clear">Limpar</button>
+      <div><p class="step">Revisão</p><h2>Seu histórico de estudo</h2></div>
+      <div class="history-actions">
+        <button id="history-errors-only" type="button" class="history-filter" aria-pressed="false">Revisar erros</button>
+        <button id="history-clear" type="button" class="history-clear">Limpar</button>
+      </div>
     </div>
     <p id="history-status" class="history-status">Carregando histórico…</p>
     <div id="history-list" class="history-list"></div>
@@ -213,10 +241,16 @@ export function mountHistory(): void {
     await renderHistory();
   });
 
+  document.getElementById("history-errors-only")?.addEventListener("click", () => {
+    onlyErrors = !onlyErrors;
+    void renderHistory();
+  });
+
   const observer = new MutationObserver(() => {
     void captureResult();
   });
   observer.observe(resultContent, { subtree: true, childList: true, characterData: true, attributes: true });
 
+  window.addEventListener("motor-history-updated", scheduleRender);
   void renderHistory();
 }

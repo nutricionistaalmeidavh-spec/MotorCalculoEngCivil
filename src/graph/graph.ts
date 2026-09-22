@@ -1,5 +1,5 @@
 import JXG from "jsxgraph";
-import type { CalculationResult, GraphOverlay, RootResult } from "../math/engine";
+import type { CalculationResult, GraphOverlay, GraphPoint, RootResult } from "../math/engine";
 
 let board: any;
 let plottedObjects: any[] = [];
@@ -68,6 +68,18 @@ function addRoots(activeBoard: any, roots: RootResult[]): void {
   }
 }
 
+function addGraphPoints(activeBoard: any, points: GraphPoint[]): void {
+  for (const graphPoint of points.slice(0, 16)) {
+    const point = activeBoard.create("point", [graphPoint.x, graphPoint.y], {
+      name: graphPoint.label,
+      fixed: true,
+      size: graphPoint.kind === "critical" ? 4 : 3,
+      face: graphPoint.kind === "critical" ? "o" : "[]",
+    });
+    plottedObjects.push(point);
+  }
+}
+
 function addOverlay(activeBoard: any, overlay: GraphOverlay): void {
   const attributes =
     overlay.kind === "derivative"
@@ -109,7 +121,6 @@ function addIntegralRegion(
   const region = activeBoard.create("curve", [xs, ys], {
     strokeOpacity: 0,
     fillOpacity: 0.18,
-    fillColor: "#60a5fa",
     fixed: true,
     highlight: false,
   });
@@ -145,6 +156,7 @@ export function plotCalculation(result: CalculationResult): void {
     }
 
     addRoots(activeBoard, result.roots);
+    addGraphPoints(activeBoard, result.graph_points ?? []);
   } finally {
     activeBoard.unsuspendUpdate();
   }

@@ -1,6 +1,8 @@
 import kernelSource from "./kernel.py?raw";
+import studyKernelSource from "./study_kernel.py?raw";
 
 export type MathOperation =
+  | "analyze"
   | "graph"
   | "roots"
   | "differentiate"
@@ -29,6 +31,13 @@ export interface GraphOverlay {
   js: string;
 }
 
+export interface GraphPoint {
+  kind: "critical" | "inflection";
+  label: string;
+  x: number;
+  y: number;
+}
+
 export interface IntegralRegion {
   lower: number;
   upper: number;
@@ -43,7 +52,9 @@ export interface CalculationResult {
   roots: RootResult[];
   warnings: string[];
   details: ResultDetail[];
+  steps: ResultDetail[];
   graph_overlays: GraphOverlay[];
+  graph_points: GraphPoint[];
   integral_region: IntegralRegion | null;
 }
 
@@ -118,6 +129,7 @@ async function createRuntime(): Promise<PyodideRuntime> {
   }
 
   await runtime.runPythonAsync(kernelSource);
+  await runtime.runPythonAsync(studyKernelSource);
   return runtime;
 }
 
@@ -126,22 +138,26 @@ export function initializeMathEngine(): Promise<void> {
   return runtimePromise.then(() => undefined);
 }
 
-export async function calculate(request: CalculationRequest): Promise<CalculationResult> {
+async function runtime(): Promise<PyodideRuntime> {
   runtimePromise ??= createRuntime();
-  const runtime = await runtimePromise;
+  return runtimePromise;
+}
 
-  runtime.globals.set("_op", request.operation);
-  runtime.globals.set("_expr", request.expression);
-  runtime.globals.set("_var", request.variable ?? "x");
-  runtime.globals.set("_target", request.target ?? "0");
-  runtime.globals.set("_direction", request.direction ?? "+-");
-  runtime.globals.set("_lower", request.lower ?? "");
-  runtime.globals.set("_upper", request.upper ?? "");
-  runtime.globals.set("_derivative_order", request.derivativeOrder ?? 1);
-  runtime.globals.set("_tangent_point", request.tangentPoint ?? "");
+export async function calculate(request: CalculationRequest): Promise<CalculationResult> {
+  const activeRuntime = await runtime();
+
+  activeRuntime.globals.set("_op", request.operation);
+  activeRuntime.globals.set("_expr", request.expression);
+  activeRuntime.globals.set("_var", request.variable ?? "x");
+  activeRuntime.globals.set("_target", request.target ?? "0");
+  activeRuntime.globals.set("_direction", request.direction ?? "+-");
+  activeRuntime.globals.set("_lower", request.lower ?? "");
+  activeRuntime.globals.set("_upper", request.upper ?? "");
+  activeRuntime.globals.set("_derivative_order", request.derivativeOrder ?? 1);
+  activeRuntime.globals.set("_tangent_point", request.tangentPoint ?? "");
 
   try {
-    const raw = await runtime.runPythonAsync(
+    const raw = await activeRuntime.runPythonAsync(
       "calculate_json(_op, _expr, _var, _target, _direction, _lower, _upper, _derivative_order, _tangent_point)",
     );
     return JSON.parse(String(raw)) as CalculationResult;
@@ -161,7 +177,31 @@ export async function calculate(request: CalculationRequest): Promise<Calculatio
       "_derivative_order",
       "_tangent_point",
     ]) {
-      runtime.globals.delete(name);
+      activeRuntime.globals.delete(name);
+    }
+  }
+}
+
+export async function checkEquivalent(
+  expected: string,
+  answer: string,
+  variable = "x",
+): Promise<boolean> {
+  const activeRuntime = await runtime();
+  activeRuntime.globals.set("_expected", expected);
+  activeRuntime.globals.set("_answer", answer);
+  activeRuntime.globals.set("_answer_var", variable);
+
+  try {
+    const raw = await activeRuntime.runPythonAsync(
+      "json.dumps(bool(answers_equivalent(_expected, _answer, _answer_var)))",
+    );
+    return JSON.parse(String(raw)) as boolean;
+  } catch {
+    return false;
+  } finally {
+    for (const name of ["_expected", "_answer", "_answer_var"]) {
+      activeRuntime.globals.delete(name);
     }
   }
 }
