@@ -10,7 +10,7 @@
     "test": "vitest run",
     "typecheck": "tsc -b --pretty false",
     "build": "npm run prepare:runtime && npm run typecheck && vite build",
-    "preview:test": "vite --host 127.0.0.1 --port 4173",
+    "preview:test": "vite preview --host 127.0.0.1 --port 4173",
     "test:e2e": "playwright test",
     "provision": "bash scripts/provision.sh",
     "deploy": "bash scripts/deploy.sh"
