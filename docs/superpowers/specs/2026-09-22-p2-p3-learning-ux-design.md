@@ -114,7 +114,7 @@ Transforma dados estáticos do mapa + resumo de progresso em um modelo pronto pa
 
 Responsabilidades:
 
-- mapear operações/tópicos históricos para nós do mapa;
+- mapear registros históricos para nós do mapa;
 - anexar estado de domínio a cada nó;
 - calcular contadores de erros e tentativas;
 - expor conexões entre nós em formato simples e testável;
@@ -174,6 +174,7 @@ Continua sendo o controlador da navegação principal e ganha integração míni
 
 - alternar `study`, `mindmap`, `exam`;
 - receber ação `Praticar agora` e preencher a entrada universal com um exemplo relacionado;
+- preservar o `topicId` desse exercício no contexto da entrada até o registro no histórico;
 - receber ação `Revisar meus erros` e direcionar o histórico para o filtro de erros daquele tópico;
 - não incorporar a lógica de cálculo de progresso.
 
@@ -181,30 +182,48 @@ Continua sendo o controlador da navegação principal e ganha integração míni
 
 O IndexedDB `motor-calculo-eng-civil` continua sendo a única fonte persistente.
 
-O histórico atual é limitado a 60 registros. Para que sequência, precisão e estado de domínio não oscilem cedo demais por descarte, P2 elevará `MAX_HISTORY` para **240** registros. Não haverá migração de schema porque o formato de `HistoryEntry` já comporta os campos necessários e o object store não muda.
+O histórico atual é limitado a 60 registros. Para que sequência, precisão e estado de domínio não oscilem cedo demais por descarte, P2 elevará `MAX_HISTORY` para **240** registros.
+
+`HistoryEntry` ganhará um campo opcional `topicId?: string`. Isso **não exige migração de schema nem aumento de `DB_VERSION`**, porque IndexedDB armazena objetos sem schema rígido e o object store, sua key e seus índices permanecem inalterados. Registros antigos continuam válidos.
 
 `practice` conta como atividade de estudo, mas não entra na taxa de acerto. Somente `correct` e `incorrect` são tentativas avaliadas.
 
 ## Mapeamento de histórico para tópicos
 
-O progresso não dependerá de strings localizadas salvas em `topic`. O agrupamento preferencial usa `operation`; `topic` fica como fallback para entradas antigas ou casos específicos.
+O agrupamento segue esta ordem:
 
-Mapeamento inicial:
+1. `HistoryEntry.topicId` quando presente e reconhecido;
+2. mapeamento por `operation` como fallback;
+3. `topic` localizado apenas como fallback de compatibilidade para registros antigos conhecidos;
+4. se nenhum mapeamento for possível, o registro não entra em métricas de tópico, mas continua contando como atividade para sequência.
+
+Mapeamento inicial de `operation`:
 
 | Operação | Nó do mapa |
 | --- | --- |
-| `limit` | limites |
-| `differentiate` | derivadas |
-| `integrate` | integrais |
-| `analyze` | analise-funcoes |
-| `graph` | funcoes |
-| `roots` | funcoes |
-| `simplify` | algebra |
-| `factor` | algebra |
-| `expand` | algebra |
-| `solve` | algebra |
+| `limit` | `limites` |
+| `differentiate` | `derivadas` |
+| `integrate` | `integrais` |
+| `analyze` | `analise-funcoes` |
+| `graph` | `funcoes` |
+| `roots` | `funcoes` |
+| `simplify` | `algebra` |
+| `factor` | `algebra` |
+| `expand` | `algebra` |
+| `solve` | `algebra` |
 
-`Aplicações de derivadas` recebe atividade de questões de derivada classificadas pelo banco local como aplicação e de análises de função quando houver informação de tópico específica. Até existir metadado mais granular em todas as entradas, o nó pode compartilhar parte da evidência de `analyze`, mas isso deve ser explícito no modelo e testado.
+`Aplicações de derivadas` terá o ID `aplicacoes-derivadas` e **não herdará automaticamente** toda atividade de `analyze` ou `differentiate`, evitando duplicar evidência de domínio. Questões específicas de aplicação terão `topicId: "aplicacoes-derivadas"`.
+
+Para isso:
+
+- `ExamQuestion` ganha `topicId` estável;
+- as questões existentes recebem IDs explícitos de tópico;
+- será incluída ao menos uma questão local de aplicação de derivadas no banco de Modo Prova;
+- `Praticar agora` no mapa salva temporariamente o `topicId` do exemplo selecionado no contexto da entrada universal;
+- quando esse exercício é registrado no histórico, o `topicId` é persistido;
+- entrada digitada livremente sem contexto usa o fallback por `operation`.
+
+Assim cada registro pertence a **um único tópico primário** para métricas de domínio.
 
 ## Estados de domínio
 
@@ -321,9 +340,9 @@ Ao selecionar um nó, mostrar:
 - botão `Praticar agora`;
 - botão `Revisar meus erros` quando houver erros.
 
-`Praticar agora` usa exemplos definidos em `mindmap/data.ts` e volta para a visão Estudar com a entrada universal preenchida. Não executa a questão automaticamente.
+`Praticar agora` usa exemplos definidos em `mindmap/data.ts`, define o `topicId` daquele exemplo no contexto temporário da entrada e volta para a visão Estudar com a questão preenchida. Não executa a questão automaticamente. Se o usuário editar livremente a questão depois, esse contexto é descartado para evitar classificação incorreta.
 
-`Revisar meus erros` abre a área de histórico já filtrada pelo tópico e por `incorrect`.
+`Revisar meus erros` abre a área de histórico já filtrada por `topicId` e `incorrect`.
 
 ## Atualização reativa
 
@@ -331,7 +350,7 @@ Fluxo após uma questão de prova:
 
 ```text
 ExamController
-  -> addHistoryEntry()
+  -> addHistoryEntry(topicId)
   -> dispatch motor-history-updated
   -> history/ui atualiza
   -> progress/ui relê histórico
@@ -343,7 +362,7 @@ Fluxo de prática comum:
 
 ```text
 Resultado calculado
-  -> history/ui captura prática
+  -> history/ui captura prática (+ topicId quando houver contexto do mapa)
   -> addHistoryEntry()
   -> motor-history-updated
   -> progresso e mapa atualizam
@@ -412,6 +431,7 @@ Se IndexedDB falhar:
 
 Entradas sem `outcome` são tratadas como `practice`.
 Entradas sem `mode` continuam válidas.
+Entradas sem `topicId` usam os fallbacks definidos neste documento.
 Entradas com operação desconhecida não entram em métricas por tópico, mas ainda contam como dia ativo para sequência.
 
 ### Conteúdo matemático do painel
@@ -448,7 +468,10 @@ Cobrir:
 - sequência começando ontem;
 - sequência quebrada por lacuna;
 - seleção determinística da missão;
-- fallback quando todos os tópicos estão dominados.
+- fallback quando todos os tópicos estão dominados;
+- `topicId` tem precedência sobre `operation`;
+- registro sem `topicId` usa fallback por `operation`;
+- um registro alimenta apenas um tópico primário.
 
 ### `mindmap/model.test.ts`
 
@@ -460,6 +483,7 @@ Cobrir:
 - estado de progresso anexado corretamente;
 - contagem de erros por tópico;
 - mapeamento de operações;
+- `aplicacoes-derivadas` não herda genericamente toda atividade de derivadas/análise;
 - ordem pedagógica estável.
 
 ### Regressão
@@ -483,7 +507,7 @@ P2/P3 está concluído quando:
 4. os estados mudam após novas entradas de histórico sem reload;
 5. o painel de progresso mostra sequência, acerto, domínio e missão;
 6. a missão segue as regras determinísticas deste documento;
-7. `Praticar agora` pré-carrega uma questão adequada na visão Estudar;
+7. `Praticar agora` pré-carrega uma questão adequada na visão Estudar e preserva seu `topicId` até o registro, salvo edição manual;
 8. `Revisar meus erros` filtra erros do tópico;
 9. o app continua funcional com IndexedDB indisponível, exceto métricas persistentes;
 10. motion respeita `prefers-reduced-motion`;
@@ -495,8 +519,9 @@ P2/P3 está concluído quando:
 
 - usar HTML + SVG + CSS para o mapa, sem biblioteca de grafos;
 - derivar progresso exclusivamente do histórico local;
+- adicionar `topicId` opcional aos registros para granularidade sem novo store;
 - aumentar retenção do histórico para 240 entradas;
-- não alterar schema IndexedDB;
+- não aumentar `DB_VERSION` nem alterar object store/índices;
 - não criar store global; continuar com eventos locais;
 - não bloquear tópicos por pré-requisitos;
 - não usar XP, ranking ou moedas;
