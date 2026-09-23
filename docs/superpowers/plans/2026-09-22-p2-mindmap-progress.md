@@ -4,7 +4,7 @@
 
 **Goal:** Add a local, history-derived Cálculo 1 progress system with an interactive mind map, deterministic study mission, topic-aware review, and no new runtime dependency.
 
-**Architecture:** Keep IndexedDB history as the only persistent source of truth. Introduce pure progress/topic models first, then build a static HTML+SVG mind map and progress UI on top, finally wire map actions into the existing study/history flows through `topicId` and the existing `motor-history-updated` event.
+**Architecture:** Keep IndexedDB history as the only persistent source of truth. Introduce pure progress/topic models first, then build a static HTML+SVG mind map and progress UI on top, finally wire map and mission actions into existing study/history flows through `topicId` and the existing `motor-history-updated` event.
 
 **Tech Stack:** TypeScript 7, Vitest 5, Vite 8, IndexedDB, KaTeX, HTML, SVG, CSS, existing PWA/event architecture.
 
@@ -77,28 +77,9 @@ Expected: FAIL because `ExamQuestion` has no `topicId` and no application questi
 
 - [ ] **Step 3: Add backward-compatible history metadata and retention**
 
-In `src/history/storage.ts`:
+In `src/history/storage.ts` add `topicId?: string` to `HistoryEntry` and change only:
 
 ```ts
-export interface HistoryEntry {
-  id: string;
-  createdAt: number;
-  expression: string;
-  operation: string;
-  variable: string;
-  resultText: string;
-  topic?: string;
-  topicId?: string;
-  outcome?: HistoryOutcome;
-  mode?: HistoryMode;
-  target?: string;
-  direction?: string;
-  derivativeOrder?: number;
-  tangentPoint?: string;
-  lower?: string;
-  upper?: string;
-}
-
 const MAX_HISTORY = 240;
 ```
 
@@ -119,7 +100,7 @@ export type ExamTopicId =
   | "algebra";
 ```
 
-Add `topicId: ExamTopicId` to `ExamQuestion`, assign existing questions to the appropriate IDs, and append:
+Add `topicId: ExamTopicId` to `ExamQuestion`, assign every existing question, and append:
 
 ```ts
 {
@@ -133,7 +114,7 @@ Add `topicId: ExamTopicId` to `ExamQuestion`, assign existing questions to the a
 },
 ```
 
-- [ ] **Step 5: Persist `topicId` from exam attempts**
+- [ ] **Step 5: Persist exam `topicId`**
 
 In `src/study/exam-controller.ts`, include:
 
@@ -148,18 +129,15 @@ inside the object passed to `buildHistoryEntry()`.
 ```bash
 npm test -- src/study/exam.test.ts
 npm run typecheck
-```
-
-Expected: PASS.
-
-```bash
 git add src/history/storage.ts src/study/exam.ts src/study/exam-controller.ts src/study/exam.test.ts
 git commit -m "feat: add stable topic metadata"
 ```
 
+Expected: tests and typecheck PASS.
+
 ---
 
-### Task 2: Build the pure progress model
+### Task 2: Build the pure progress and mission model
 
 **Files:**
 - Create: `src/progress/topics.ts`
@@ -170,7 +148,7 @@ git commit -m "feat: add stable topic metadata"
 - Consumes: `HistoryEntry[]`.
 - Produces: `TOPIC_ORDER`, `TopicId`, `resolveTopicId(entry)`, `buildProgress(entries, now?)`, `ProgressSummary`, `TopicProgress`, `StudyMission`.
 
-- [ ] **Step 1: Write failing topic and progress tests**
+- [ ] **Step 1: Write failing state/fallback/streak tests**
 
 Create `src/progress/model.test.ts`:
 
@@ -180,7 +158,7 @@ import type { HistoryEntry } from "../history/storage";
 import { buildProgress } from "./model";
 
 const at = (iso: string, patch: Partial<HistoryEntry> = {}): HistoryEntry => ({
-  id: iso,
+  id: `${iso}-${patch.topicId ?? patch.operation ?? "entry"}`,
   createdAt: new Date(iso).getTime(),
   expression: "x",
   operation: "limit",
@@ -199,7 +177,7 @@ describe("buildProgress", () => {
     expect(result.byTopic.limites.state).toBe("studying");
   });
 
-  it("moves a weak assessed topic to review", () => {
+  it("moves weak performance to review", () => {
     const result = buildProgress([
       at("2026-09-20T12:00:00-03:00", { outcome: "incorrect" }),
       at("2026-09-21T12:00:00-03:00", { outcome: "correct" }),
@@ -207,7 +185,7 @@ describe("buildProgress", () => {
     expect(result.byTopic.limites.state).toBe("review");
   });
 
-  it("requires three correct assessed attempts before mastered", () => {
+  it("requires at least three correct answers for mastered", () => {
     const result = buildProgress([
       at("2026-09-20T10:00:00-03:00", { outcome: "correct" }),
       at("2026-09-21T10:00:00-03:00", { outcome: "correct" }),
@@ -215,7 +193,7 @@ describe("buildProgress", () => {
     expect(result.byTopic.limites.state).toBe("studying");
   });
 
-  it("recovers to mastered after sufficient later correctness", () => {
+  it("recovers to mastered at 80 percent with a latest correct answer", () => {
     const result = buildProgress([
       at("2026-09-18T10:00:00-03:00", { outcome: "incorrect" }),
       at("2026-09-19T10:00:00-03:00", { outcome: "correct" }),
@@ -226,17 +204,17 @@ describe("buildProgress", () => {
     expect(result.byTopic.limites.state).toBe("mastered");
   });
 
-  it("removes mastered when the newest assessed attempt is wrong", () => {
-    const history = [
+  it("removes mastered when the newest assessed result is incorrect", () => {
+    const result = buildProgress([
       at("2026-09-18T10:00:00-03:00", { outcome: "correct" }),
       at("2026-09-19T10:00:00-03:00", { outcome: "correct" }),
       at("2026-09-20T10:00:00-03:00", { outcome: "correct" }),
       at("2026-09-21T10:00:00-03:00", { outcome: "incorrect" }),
-    ];
-    expect(buildProgress(history, new Date("2026-09-22T21:00:00-03:00")).byTopic.limites.state).toBe("review");
+    ], new Date("2026-09-22T21:00:00-03:00"));
+    expect(result.byTopic.limites.state).toBe("review");
   });
 
-  it("prefers explicit topicId over operation and never double counts", () => {
+  it("prefers topicId over operation and never double counts", () => {
     const result = buildProgress([
       at("2026-09-22T10:00:00-03:00", {
         operation: "differentiate",
@@ -257,7 +235,7 @@ describe("buildProgress", () => {
     expect(result.streakDays).toBe(1);
   });
 
-  it("starts streak today or yesterday and stops on a gap", () => {
+  it("starts streak yesterday and stops at the first gap", () => {
     const history = [
       at("2026-09-19T09:00:00-03:00"),
       at("2026-09-20T09:00:00-03:00"),
@@ -268,7 +246,7 @@ describe("buildProgress", () => {
 });
 ```
 
-- [ ] **Step 2: Run the test and confirm red**
+- [ ] **Step 2: Run and confirm red**
 
 ```bash
 npm test -- src/progress/model.test.ts
@@ -276,7 +254,7 @@ npm test -- src/progress/model.test.ts
 
 Expected: FAIL because the progress module does not exist.
 
-- [ ] **Step 3: Define stable topic IDs and fallback mapping**
+- [ ] **Step 3: Define stable IDs and fallback mapping**
 
 Create `src/progress/topics.ts`:
 
@@ -292,33 +270,19 @@ export const TOPIC_ORDER = [
   "analise-funcoes",
   "integrais",
 ] as const;
-
 export type TopicId = (typeof TOPIC_ORDER)[number];
 
 const OPERATION_TOPIC: Record<string, TopicId> = {
-  simplify: "algebra",
-  factor: "algebra",
-  expand: "algebra",
-  solve: "algebra",
-  graph: "funcoes",
-  roots: "funcoes",
-  limit: "limites",
-  differentiate: "derivadas",
-  analyze: "analise-funcoes",
-  integrate: "integrais",
+  simplify: "algebra", factor: "algebra", expand: "algebra", solve: "algebra",
+  graph: "funcoes", roots: "funcoes", limit: "limites",
+  differentiate: "derivadas", analyze: "analise-funcoes", integrate: "integrais",
 };
 
 const LEGACY_TOPIC: Record<string, TopicId> = {
-  "Álgebra": "algebra",
-  "Fatoração": "algebra",
-  "Equações": "algebra",
-  "Gráficos": "funcoes",
-  "Raízes e zeros": "funcoes",
-  "Limites": "limites",
-  "Derivadas": "derivadas",
-  "Aplicações de derivadas": "aplicacoes-derivadas",
-  "Análise de funções": "analise-funcoes",
-  "Integrais": "integrais",
+  "Álgebra": "algebra", "Fatoração": "algebra", "Equações": "algebra",
+  "Gráficos": "funcoes", "Raízes e zeros": "funcoes", "Limites": "limites",
+  "Derivadas": "derivadas", "Aplicações de derivadas": "aplicacoes-derivadas",
+  "Análise de funções": "analise-funcoes", "Integrais": "integrais",
 };
 
 export function isTopicId(value: string | undefined): value is TopicId {
@@ -331,13 +295,12 @@ export function resolveTopicId(entry: HistoryEntry): TopicId | null {
 }
 ```
 
-- [ ] **Step 4: Implement the pure model exactly from the spec rules**
+- [ ] **Step 4: Implement the model contracts and exact state rules**
 
-Create `src/progress/model.ts` exporting:
+Create `src/progress/model.ts` with:
 
 ```ts
 export type TopicState = "not_started" | "studying" | "review" | "mastered";
-
 export interface TopicProgress {
   id: TopicId;
   state: TopicState;
@@ -350,15 +313,13 @@ export interface TopicProgress {
   latestAssessedAt: number | null;
   latestAssessedOutcome: "correct" | "incorrect" | null;
 }
-
 export interface StudyMission {
   topicId: TopicId;
   kind: "review" | "practice" | "explore" | "maintenance";
   title: string;
   reason: string;
-  targetView: "study" | "exam";
+  targetView: "study";
 }
-
 export interface ProgressSummary {
   byTopic: Record<TopicId, TopicProgress>;
   overallPercent: number;
@@ -371,34 +332,70 @@ export interface ProgressSummary {
   priorityTopicId: TopicId;
   mission: StudyMission;
 }
-
 export function buildProgress(entries: HistoryEntry[], now = new Date()): ProgressSummary;
 ```
 
-Implement state order exactly: empty → `not_started`; mastery check; review check; otherwise `studying`. Treat missing `outcome` as `practice`. Overall weights are `0`, `0.40`, `0.55`, `1.00`. Use local `getFullYear()/getMonth()/getDate()` keys for streaks. Mission tie-breaking follows the spec in order.
+Implementation rules are literal from the spec: missing `outcome` becomes `practice`; mastery is checked before review; weights are `0`, `0.40`, `0.55`, `1.00`; local calendar dates use `getFullYear()/getMonth()/getDate()`; all initial mission CTAs target `study` so the topic can be prefilled consistently.
 
-- [ ] **Step 5: Add deterministic mission tests**
+- [ ] **Step 5: Add concrete mission and overall-progress tests**
 
-Append concrete fixtures that assert: review topics win; lower accuracy wins; more errors breaks ties; newest error breaks the next tie; otherwise least-correct studying topic; otherwise first not-started in `TOPIC_ORDER`; all mastered falls back to maintenance.
+Append:
 
-- [ ] **Step 6: Run focused and full TypeScript tests, then commit**
+```ts
+it("prioritizes a review topic over untouched topics", () => {
+  const result = buildProgress([
+    at("2026-09-22T10:00:00-03:00", { topicId: "limites", outcome: "incorrect" }),
+  ], new Date("2026-09-22T21:00:00-03:00"));
+  expect(result.priorityTopicId).toBe("limites");
+  expect(result.mission.kind).toBe("review");
+  expect(result.mission.targetView).toBe("study");
+});
+
+it("uses lower accuracy to break review priority", () => {
+  const result = buildProgress([
+    at("2026-09-20T10:00:00-03:00", { topicId: "limites", outcome: "incorrect" }),
+    at("2026-09-21T10:00:00-03:00", { topicId: "limites", outcome: "correct" }),
+    at("2026-09-19T10:00:00-03:00", { topicId: "derivadas", outcome: "incorrect" }),
+    at("2026-09-20T11:00:00-03:00", { topicId: "derivadas", outcome: "incorrect" }),
+    at("2026-09-21T11:00:00-03:00", { topicId: "derivadas", outcome: "correct" }),
+  ], new Date("2026-09-22T21:00:00-03:00"));
+  expect(result.priorityTopicId).toBe("derivadas");
+});
+
+it("uses the first not-started topic when nothing needs review", () => {
+  const result = buildProgress([], new Date("2026-09-22T21:00:00-03:00"));
+  expect(result.priorityTopicId).toBe("algebra");
+  expect(result.mission.kind).toBe("explore");
+});
+
+it("computes overall progress from topic-state weights", () => {
+  const result = buildProgress([
+    at("2026-09-20T10:00:00-03:00", { topicId: "limites", outcome: "correct" }),
+    at("2026-09-21T10:00:00-03:00", { topicId: "limites", outcome: "correct" }),
+    at("2026-09-22T10:00:00-03:00", { topicId: "limites", outcome: "correct" }),
+  ], new Date("2026-09-22T21:00:00-03:00"));
+  expect(result.byTopic.limites.state).toBe("mastered");
+  expect(result.overallPercent).toBe(14);
+});
+```
+
+Also add an all-mastered fixture by generating three explicit `correct` entries for each `TOPIC_ORDER` ID and assert `mission.kind === "maintenance"`.
+
+- [ ] **Step 6: Run focused/full tests and commit**
 
 ```bash
 npm test -- src/progress/model.test.ts
 npm test
 npm run typecheck
-```
-
-Expected: PASS.
-
-```bash
 git add src/progress/topics.ts src/progress/model.ts src/progress/model.test.ts
 git commit -m "feat: derive study progress from history"
 ```
 
+Expected: PASS.
+
 ---
 
-### Task 3: Define and validate the mind-map content model
+### Task 3: Define and validate mind-map content/topology
 
 **Files:**
 - Create: `src/mindmap/data.ts`
@@ -406,7 +403,7 @@ git commit -m "feat: derive study progress from history"
 - Create: `src/mindmap/model.test.ts`
 
 **Interfaces:**
-- Consumes: `TopicId`, `ProgressSummary`, `TopicProgress` from Task 2.
+- Consumes: `TopicId`, `ProgressSummary` from Task 2.
 - Produces: `MIND_MAP_TOPICS`, `MIND_MAP_EDGES`, `buildMindMap(progress)`, `MindMapNode`, `MindMapModel`.
 
 - [ ] **Step 1: Write failing topology tests**
@@ -419,7 +416,7 @@ import { buildProgress } from "../progress/model";
 import { MIND_MAP_EDGES, MIND_MAP_TOPICS } from "./data";
 import { buildMindMap } from "./model";
 
-it("has seven unique ordered topics and valid edges", () => {
+it("has seven unique topics and only valid edges", () => {
   const ids = MIND_MAP_TOPICS.map((topic) => topic.id);
   expect(ids).toHaveLength(7);
   expect(new Set(ids).size).toBe(7);
@@ -431,14 +428,8 @@ it("has seven unique ordered topics and valid edges", () => {
 
 it("does not inherit generic derivative activity into applications", () => {
   const progress = buildProgress([{
-    id: "1",
-    createdAt: Date.now(),
-    expression: "x^2",
-    operation: "differentiate",
-    variable: "x",
-    resultText: "2*x",
-    outcome: "correct",
-    mode: "exam",
+    id: "1", createdAt: Date.now(), expression: "x^2", operation: "differentiate",
+    variable: "x", resultText: "2*x", outcome: "correct", mode: "exam",
   }]);
   const model = buildMindMap(progress);
   expect(model.nodes.find((node) => node.id === "derivadas")?.correct).toBe(1);
@@ -452,13 +443,40 @@ it("does not inherit generic derivative activity into applications", () => {
 npm test -- src/mindmap/model.test.ts
 ```
 
-Expected: FAIL because map files do not exist.
+Expected: FAIL because map modules do not exist.
 
-- [ ] **Step 3: Create the static topic catalog**
+- [ ] **Step 3: Create the complete static topic catalog**
 
-`src/mindmap/data.ts` exports a `MindMapTopic` interface containing `id`, `title`, `summary`, `concepts`, `formulas`, `relatedOperations`, and `practiceQuestion`, plus exactly these topic IDs: `algebra`, `funcoes`, `limites`, `derivadas`, `aplicacoes-derivadas`, `analise-funcoes`, `integrais`.
+`MindMapTopic` contains:
 
-Define edges exactly from the spec:
+```ts
+interface MindMapTopic {
+  id: TopicId;
+  title: string;
+  summary: string;
+  concepts: string[];
+  formulas: string[];
+  relatedOperations: string[];
+  practiceQuestion: string;
+  desktop: { column: number; row: number };
+}
+```
+
+Use these seven entries/content anchors:
+
+```ts
+{ id: "algebra", title: "Álgebra de apoio", concepts: ["fatoração", "simplificação", "equações"], formulas: ["a^2-b^2=(a-b)(a+b)"], practiceQuestion: "Fatore x² - 4" , desktop: { column: 1, row: 2 } }
+{ id: "funcoes", title: "Funções", concepts: ["domínio", "imagem", "zeros", "gráfico"], formulas: ["y=f(x)"], practiceQuestion: "Encontre as raízes de f(x)=x²-4x+3", desktop: { column: 2, row: 2 } }
+{ id: "limites", title: "Limites", concepts: ["aproximação", "continuidade", "limites laterais"], formulas: ["\\lim_{x\\to a} f(x)"], practiceQuestion: "Calcule o limite de (x²-4)/(x-2) quando x tende a 2", desktop: { column: 3, row: 1 } }
+{ id: "derivadas", title: "Derivadas", concepts: ["taxa de variação", "reta tangente", "regras de derivação"], formulas: ["f'(x)=\\lim_{h\\to0}\\frac{f(x+h)-f(x)}{h}"], practiceQuestion: "Encontre a derivada de f(x)=x³-6x²+9x", desktop: { column: 3, row: 3 } }
+{ id: "aplicacoes-derivadas", title: "Aplicações de derivadas", concepts: ["taxas", "otimização", "movimento"], formulas: ["v(t)=s'(t)"], practiceQuestion: "Para h(x)=x³-6x²+9x, encontre a taxa instantânea h′(x)", desktop: { column: 4, row: 3 } }
+{ id: "analise-funcoes", title: "Análise completa de funções", concepts: ["crescimento", "extremos", "concavidade", "inflexão"], formulas: ["f'(x)=0", "f''(x)=0"], practiceQuestion: "Analise f(x)=x³-3x e encontre máximos e mínimos", desktop: { column: 5, row: 3 } }
+{ id: "integrais", title: "Integrais", concepts: ["primitiva", "área", "integral definida"], formulas: ["\\int_a^b f(x)\\,dx"], practiceQuestion: "Calcule a integral de x de 0 até 2", desktop: { column: 4, row: 1 } }
+```
+
+Fill each `summary` with at most three concise sentences and set `relatedOperations` from the corresponding app operations.
+
+Define edges exactly:
 
 ```ts
 export const MIND_MAP_EDGES = [
@@ -474,27 +492,24 @@ export const MIND_MAP_EDGES = [
 ] as const;
 ```
 
-- [ ] **Step 4: Build the render-ready model**
+- [ ] **Step 4: Build render-ready nodes without recomputing mastery**
 
-`buildMindMap(progress)` returns nodes in `TOPIC_ORDER`, with each node carrying title/content plus `state`, `practice`, `correct`, `incorrect`, `incoming`, and `outgoing`. Do not derive additional mastery here; use `ProgressSummary.byTopic` as the source of state.
+`buildMindMap(progress)` maps `MIND_MAP_TOPICS` to nodes carrying all editorial fields plus `state`, `practice`, `correct`, `incorrect`, `incoming`, and `outgoing`, taking state/counts only from `progress.byTopic`.
 
 - [ ] **Step 5: Run tests and commit**
 
 ```bash
 npm test -- src/mindmap/model.test.ts src/progress/model.test.ts
 npm run typecheck
-```
-
-Expected: PASS.
-
-```bash
 git add src/mindmap/data.ts src/mindmap/model.ts src/mindmap/model.test.ts
 git commit -m "feat: add calculus mind map model"
 ```
 
+Expected: PASS.
+
 ---
 
-### Task 4: Add pure history filtering for topic-aware review
+### Task 4: Add pure topic-aware history filtering
 
 **Files:**
 - Create: `src/history/filter.ts`
@@ -503,7 +518,7 @@ git commit -m "feat: add calculus mind map model"
 
 **Interfaces:**
 - Consumes: `HistoryEntry[]`, `TopicId | "all"`, outcome filter.
-- Produces: `filterHistoryEntries(entries, filters)`; window event contract `motor-history-filter` with `{ topicId, outcome }`.
+- Produces: `filterHistoryEntries(entries, filters)`; event contract `motor-history-filter` with `{ topicId, outcome }`.
 
 - [ ] **Step 1: Write failing filter tests**
 
@@ -523,8 +538,7 @@ const entries: HistoryEntry[] = [
 it("combines topic and outcome filters", () => {
   expect(filterHistoryEntries(entries, { topicId: "limites", outcome: "incorrect" }).map((entry) => entry.id)).toEqual(["1"]);
 });
-
-it("uses topic fallback for old entries without topicId", () => {
+it("uses operation fallback for old entries without topicId", () => {
   expect(filterHistoryEntries(entries, { topicId: "limites", outcome: "all" }).map((entry) => entry.id)).toEqual(["1", "3"]);
 });
 ```
@@ -537,14 +551,13 @@ npm test -- src/history/filter.test.ts
 
 Expected: FAIL because the filter module does not exist.
 
-- [ ] **Step 3: Implement filter helper using `resolveTopicId()`**
+- [ ] **Step 3: Implement the helper with `resolveTopicId()`**
 
 ```ts
 export interface HistoryFilters {
   topicId: TopicId | "all";
   outcome: "all" | "incorrect";
 }
-
 export function filterHistoryEntries(entries: HistoryEntry[], filters: HistoryFilters): HistoryEntry[] {
   return entries.filter((entry) => {
     const topicMatches = filters.topicId === "all" || resolveTopicId(entry) === filters.topicId;
@@ -554,15 +567,15 @@ export function filterHistoryEntries(entries: HistoryEntry[], filters: HistoryFi
 }
 ```
 
-- [ ] **Step 4: Refactor `history/ui.ts` to use explicit filters**
+- [ ] **Step 4: Refactor history UI to two independent filters**
 
-Replace `onlyErrors` with:
+Use:
 
 ```ts
 let filters: HistoryFilters = { topicId: "all", outcome: "all" };
 ```
 
-Use `listHistory(240)`, then `filterHistoryEntries()`. Keep the global error button behavior by toggling only `filters.outcome`. Listen for:
+Read `listHistory(240)`, call `filterHistoryEntries()`, preserve the existing global error toggle by changing only `filters.outcome`, and listen for:
 
 ```ts
 window.addEventListener("motor-history-filter", (event) => {
@@ -573,26 +586,23 @@ window.addEventListener("motor-history-filter", (event) => {
 });
 ```
 
-Display a clear topic filter chip/button when `topicId !== "all"`; clearing it retains the current outcome filter.
+Render a removable topic-filter chip when `topicId !== "all"`; clearing the topic chip does not reset `outcome`.
 
-- [ ] **Step 5: Run tests and commit**
+- [ ] **Step 5: Run checks and commit**
 
 ```bash
 npm test -- src/history/filter.test.ts
 npm test
 npm run typecheck
-```
-
-Expected: PASS.
-
-```bash
 git add src/history/filter.ts src/history/filter.test.ts src/history/ui.ts
 git commit -m "feat: filter study history by topic"
 ```
 
+Expected: PASS.
+
 ---
 
-### Task 5: Render progress summary and interactive mind map
+### Task 5: Render progress dashboard and semantic interactive map
 
 **Files:**
 - Create: `src/progress/ui.ts`
@@ -602,12 +612,12 @@ git commit -m "feat: filter study history by topic"
 - Modify: `src/ux.css`
 
 **Interfaces:**
-- Consumes: `listHistory(240)`, `buildProgress()`, `buildMindMap()`, `MIND_MAP_TOPICS`.
-- Produces: `loadProgress()`, `renderProgressSummary(target, progress)`, `mountMindMap(container, detail)`; DOM events `motor-practice-topic`, `motor-review-topic`; new `mindmap` main view.
+- Consumes: `listHistory(240)`, `buildProgress()`, `buildMindMap()`, `HistoryEntry[]`.
+- Produces: `ProgressSnapshot`, `loadProgressSnapshot()`, `renderProgressSummary()`, `mountMindMap()`; DOM events `motor-practice-topic` and `motor-review-topic`; new `mindmap` view.
 
-- [ ] **Step 1: Add the third main view markup**
+- [ ] **Step 1: Add the third main view**
 
-In `src/study/shell.ts`, change the view switch to:
+Change navigation to:
 
 ```html
 <button type="button" class="view-tab active" data-view="study" aria-pressed="true">Estudar</button>
@@ -615,56 +625,98 @@ In `src/study/shell.ts`, change the view switch to:
 <button type="button" class="view-tab" data-view="exam" aria-pressed="false">Modo Prova</button>
 ```
 
-Add `#mindmap-view` containing:
+Add:
 
 ```html
-<section id="progress-summary" class="progress-summary" aria-live="polite"></section>
-<section class="card mindmap-card">
-  <div id="mindmap-canvas" class="mindmap-canvas"></div>
-  <aside id="mindmap-detail" class="mindmap-detail" aria-live="polite"></aside>
+<section id="mindmap-view" hidden>
+  <section id="progress-summary" class="progress-summary" aria-live="polite"></section>
+  <section class="card mindmap-card">
+    <div id="mindmap-canvas" class="mindmap-canvas"></div>
+    <aside id="mindmap-detail" class="mindmap-detail"></aside>
+  </section>
 </section>
 ```
 
-- [ ] **Step 2: Implement resilient progress loading/rendering**
+- [ ] **Step 2: Load one shared history/progress snapshot**
 
 `src/progress/ui.ts` exports:
 
 ```ts
-export async function loadProgress(): Promise<ProgressSummary | null>;
+export interface ProgressSnapshot {
+  entries: HistoryEntry[];
+  progress: ProgressSummary;
+}
+export async function loadProgressSnapshot(): Promise<ProgressSnapshot | null> {
+  try {
+    const entries = await listHistory(240);
+    return { entries, progress: buildProgress(entries) };
+  } catch {
+    return null;
+  }
+}
 export function renderProgressSummary(target: HTMLElement, progress: ProgressSummary | null): void;
 ```
 
-`loadProgress()` calls `listHistory(240)` and `buildProgress()`. It catches IndexedDB failure and returns `null`. The renderer shows overall progress, streak, assessed accuracy (`Sem questões avaliadas ainda` when null), mastered count, and mission with one CTA. For `progress === null`, render `Progresso local indisponível neste navegador` without throwing.
+The renderer shows overall percentage, streak, assessed accuracy (`Sem questões avaliadas ainda` for null accuracy), mastered count, priority reason, mission title, and one mission CTA. The initial mission model always targets study, so the CTA dispatches:
 
-- [ ] **Step 3: Implement semantic map UI**
+```ts
+window.dispatchEvent(new CustomEvent("motor-practice-topic", {
+  detail: { topicId: progress.mission.topicId },
+}));
+```
+
+For `progress === null`, render `Progresso local indisponível neste navegador` and no misleading numeric metrics.
+
+- [ ] **Step 3: Implement semantic map rendering with recent errors and KaTeX fallback**
 
 `src/mindmap/ui.ts` exports:
 
 ```ts
 export function mountMindMap(container: HTMLElement, detail: HTMLElement): {
-  refresh(progress: ProgressSummary | null): void;
+  refresh(progress: ProgressSummary | null, entries: HistoryEntry[]): void;
 };
 ```
 
-Render HTML `<button>` nodes in pedagogical order and SVG edges with `aria-hidden="true"`. Every node contains its title plus visible state text (`Não iniciado`, `Em estudo`, `Revisar`, `Dominado`). If progress is unavailable, keep all structural nodes visible with an `Indisponível` supplemental message without disabling practice.
+Each topic is an HTML `<button>` in `TOPIC_ORDER` with visible state text. The SVG is `aria-hidden="true"` and only draws edges. On desktop, use each topic's `desktop.column/row`; after nodes render, draw SVG `<line>` elements between node centers using `getBoundingClientRect()` relative to the map container and redraw on resize. On <=640px, switch to a vertical list/trail and hide the geometric SVG.
 
-The detail panel exposes topic summary, formulas/concepts, `X acertos · Y erros · Z práticas`, incoming/outgoing relations, recent-error count, `Praticar agora`, and conditional `Revisar meus erros`.
-
-- [ ] **Step 4: Wire one refresh pipeline to the existing history event**
-
-In `src/study/app.ts`, mount the map after the shell and use one function:
+On node selection, build the detail panel. Recent errors are:
 
 ```ts
-async function refreshLearningProgress(): Promise<void> {
-  const progress = await loadProgress();
-  renderProgressSummary(progressSummary, progress);
-  mindMap.refresh(progress);
+const recentErrors = entries
+  .filter((entry) => entry.outcome === "incorrect" && resolveTopicId(entry) === node.id)
+  .sort((a, b) => b.createdAt - a.createdAt)
+  .slice(0, 3);
+```
+
+Render each error's expression/result text. Render formulas through:
+
+```ts
+function renderFormula(target: HTMLElement, formula: string): void {
+  try {
+    katex.render(formula, target, { throwOnError: false });
+  } catch {
+    target.textContent = formula;
+  }
 }
 ```
 
-Call it on startup and on `motor-history-updated` so history is read once per refresh and both surfaces use the same snapshot.
+The detail panel always offers `Praticar agora`; offer `Revisar meus erros` only when `node.incorrect > 0`. Dispatch only events; do not manipulate study/history DOM directly.
 
-Update tab logic to explicit view IDs:
+- [ ] **Step 4: Use one refresh pipeline in `study/app.ts`**
+
+Create:
+
+```ts
+async function refreshLearningProgress(): Promise<void> {
+  const snapshot = await loadProgressSnapshot();
+  renderProgressSummary(progressSummary, snapshot?.progress ?? null);
+  mindMap.refresh(snapshot?.progress ?? null, snapshot?.entries ?? []);
+}
+```
+
+Call on startup and on `motor-history-updated`.
+
+Replace boolean exam navigation with:
 
 ```ts
 const views = {
@@ -674,47 +726,44 @@ const views = {
 };
 ```
 
-Hide all except the selected view and update `aria-pressed` on all tabs.
+A view switch hides all non-selected views and sets tab `aria-pressed` consistently.
 
-- [ ] **Step 5: Add responsive map/progress styling**
+- [ ] **Step 5: Add responsive map/progress CSS**
 
-Desktop/tablet: CSS grid with positioned HTML nodes and absolute decorative SVG behind them. Mobile at `max-width: 640px`: switch `.mindmap-canvas` to a vertical grid/list; hide/replace complex edge geometry with simple connector lines; no pan/zoom container.
+Desktop/tablet: map card uses a grid with the SVG behind positioned node buttons and a detail panel beside/below it. Mobile at `max-width: 640px`: nodes become a vertical trail, SVG geometry is hidden, CTAs are full-width, and no map pan/zoom is required.
 
 - [ ] **Step 6: Verify IndexedDB failure behavior**
 
-Temporarily make `loadProgress()`'s history call reject in a local verification branch or devtools override. Confirm the progress unavailable message appears, all map topics remain visible, and `Praticar agora` remains enabled. Restore normal code before commit.
+In devtools, temporarily block/delete IndexedDB permissions or temporarily force `listHistory()` to reject while testing. Confirm: progress shows unavailable; all seven structural topics still render; selecting a topic still shows concepts/formulas; `Praticar agora` remains enabled; calculations and Modo Prova still work. Restore normal code/configuration before commit.
 
-- [ ] **Step 7: Run regression tests and commit**
+- [ ] **Step 7: Run regression checks and commit**
 
 ```bash
 npm test
 python -m unittest discover -s tests -p "test_*.py"
 npm run typecheck
 npm run build
-```
-
-Expected: all pass.
-
-```bash
 git add src/progress/ui.ts src/mindmap/ui.ts src/study/shell.ts src/study/app.ts src/ux.css
 git commit -m "feat: add progress dashboard and mind map"
 ```
 
+Expected: PASS.
+
 ---
 
-### Task 6: Wire topic actions and preserve/discard practice context correctly
+### Task 6: Wire practice/mission/review actions with safe topic context
 
 **Files:**
-- Modify: `src/study/app.ts`
-- Modify: `src/history/ui.ts`
 - Create: `src/study/topic-context.ts`
 - Create: `src/study/topic-context.test.ts`
+- Modify: `src/study/app.ts`
+- Modify: `src/history/ui.ts`
 
 **Interfaces:**
-- Consumes: map events from Task 5 and `HistoryEntry.topicId` from Task 1.
-- Produces: temporary `topicId` context that survives map-prefill → solve → history capture, but clears on manual edit.
+- Consumes: `motor-practice-topic`, `motor-review-topic`, `MIND_MAP_TOPICS`, `HistoryEntry.topicId`.
+- Produces: temporary topic context that survives map/mission prefill → calculation → history capture and clears after manual edit.
 
-- [ ] **Step 1: Write failing context tests**
+- [ ] **Step 1: Write failing context test**
 
 Create `src/study/topic-context.test.ts`:
 
@@ -722,7 +771,7 @@ Create `src/study/topic-context.test.ts`:
 import { expect, it } from "vitest";
 import { createTopicContext } from "./topic-context";
 
-it("keeps map topic context until the seeded question is changed", () => {
+it("keeps context only for the exact seeded question", () => {
   const context = createTopicContext();
   context.seed("limites", "Calcule o limite de 1/x quando x tende a ∞");
   expect(context.topicIdFor("Calcule o limite de 1/x quando x tende a ∞")).toBe("limites");
@@ -736,13 +785,12 @@ it("keeps map topic context until the seeded question is changed", () => {
 npm test -- src/study/topic-context.test.ts
 ```
 
-Expected: FAIL because the context module does not exist.
+Expected: FAIL because the module does not exist.
 
-- [ ] **Step 3: Implement the pure context helper**
+- [ ] **Step 3: Implement the context helper**
 
 ```ts
 import type { TopicId } from "../progress/topics";
-
 export function createTopicContext() {
   let topicId: TopicId | null = null;
   let seededQuestion = "";
@@ -750,18 +798,17 @@ export function createTopicContext() {
     seed(id: TopicId, question: string) { topicId = id; seededQuestion = question.trim(); },
     clear() { topicId = null; seededQuestion = ""; },
     topicIdFor(question: string) {
-      if (!topicId || question.trim() !== seededQuestion) return null;
-      return topicId;
+      return topicId && question.trim() === seededQuestion ? topicId : null;
     },
   };
 }
 ```
 
-- [ ] **Step 4: Wire `Praticar agora`**
+- [ ] **Step 4: Wire map and mission `Praticar agora`**
 
-When `motor-practice-topic` fires, get the selected topic's `practiceQuestion`, call `context.seed(topicId, question)`, fill `#expression`, reset operation lock, switch to `study`, call existing intent sync, focus the textarea, and do not auto-run.
+On `motor-practice-topic`, find the topic in `MIND_MAP_TOPICS`, seed the context with its `practiceQuestion`, fill `#expression`, clear operation lock, switch to `study`, run existing intent sync, and focus the textarea. Do not auto-run.
 
-On a user-originated `input` event whose value differs from the seeded question, call `context.clear()` and delete `expressionInput.dataset.topicId`.
+On user `input`, if the value differs from the seeded question, call `context.clear()` and remove `expressionInput.dataset.topicId`.
 
 In `runCalculation()`, immediately before `renderResult(result)`, set:
 
@@ -769,13 +816,13 @@ In `runCalculation()`, immediately before `renderResult(result)`, set:
 expressionInput.dataset.topicId = context.topicIdFor(expressionInput.value) ?? "";
 ```
 
-This ordering ensures the existing result `MutationObserver` sees the topic metadata when it captures history.
+This ordering ensures the existing result `MutationObserver` captures the topic ID.
 
-In `history/ui.ts`, read `expression.dataset.topicId` in `currentSnapshot()` and set `entry.topicId` only when non-empty.
+In `history/ui.ts`, read the dataset field in `currentSnapshot()` and set `entry.topicId` only when non-empty.
 
 - [ ] **Step 5: Wire `Revisar meus erros`**
 
-When `motor-review-topic` fires, dispatch:
+On `motor-review-topic`, dispatch:
 
 ```ts
 window.dispatchEvent(new CustomEvent("motor-history-filter", {
@@ -783,7 +830,7 @@ window.dispatchEvent(new CustomEvent("motor-history-filter", {
 }));
 ```
 
-The map must not directly manipulate history rows.
+The history module owns filtering/scrolling.
 
 - [ ] **Step 6: Run all checks and commit**
 
@@ -792,14 +839,11 @@ npm test
 python -m unittest discover -s tests -p "test_*.py"
 npm run typecheck
 npm run build
-```
-
-Expected: all pass.
-
-```bash
-git add src/study/app.ts src/study/topic-context.ts src/study/topic-context.test.ts src/history/ui.ts
+git add src/study/topic-context.ts src/study/topic-context.test.ts src/study/app.ts src/history/ui.ts
 git commit -m "feat: connect mind map to study review flows"
 ```
+
+Expected: PASS.
 
 ---
 
@@ -810,9 +854,9 @@ git commit -m "feat: connect mind map to study review flows"
 
 **Interfaces:**
 - Consumes: complete P2 branch.
-- Produces: a CI-ready P2 implementation with no known regression against P0/P1.
+- Produces: CI-ready P2 with no known P0/P1 regression.
 
-- [ ] **Step 1: Run the authoritative local command set**
+- [ ] **Step 1: Run the authoritative local checks**
 
 ```bash
 npm install --no-audit --no-fund
@@ -822,34 +866,32 @@ npm run typecheck
 npm run build
 ```
 
-Expected: TypeScript tests, SymPy tests, typecheck, and production build all pass.
+Expected: all PASS.
 
-- [ ] **Step 2: Verify five review-focus cases manually in dev mode**
+- [ ] **Step 2: Verify review-focus cases in dev mode**
 
 ```bash
 npm run dev
 ```
 
-Verify: empty history shows complete `Não iniciado` map; practice-only activity shows no assessed percentage; legacy records without `topicId` map by operation; map practice context clears after manual edit; IndexedDB denial/failure leaves calculation and map practice usable while progress reports unavailable.
+Verify: empty history → seven `Não iniciado` nodes; practice-only history → no assessed percentage; legacy no-`topicId` records → operation fallback; unknown operation → streak only; mission CTA → Estudar prefilled with correct topic context; manual edit → context cleared; IndexedDB failure → structural map/practice still usable.
 
-- [ ] **Step 3: Verify desktop/mobile keyboard behavior**
+- [ ] **Step 3: Verify keyboard/mobile behavior**
 
-At desktop and <=640px widths, tab through `Estudar`, `Mapa Mental`, `Modo Prova`, every map node, `Praticar agora`, and `Revisar meus erros`. Confirm SVG edges never receive focus and mobile requires no pan gesture.
+At desktop and <=640px, tab through main tabs, every map node, topic CTAs, study controls, exam controls, and history controls. Confirm SVG edges are never focusable and mobile needs no pan gesture.
 
-- [ ] **Step 4: Run the exact CI-equivalent checks for deployment scripts**
-
-On PowerShell-capable environment:
+- [ ] **Step 4: Run deployment-script syntax checks**
 
 ```powershell
 [ScriptBlock]::Create((Get-Content -Raw 'scripts/provision.ps1')) | Out-Null
 [ScriptBlock]::Create((Get-Content -Raw 'scripts/deploy.ps1')) | Out-Null
 ```
 
-Expected: no syntax error. GitHub Actions remains the authority for Windows PowerShell 5.1.
+Expected: no syntax error. GitHub Actions remains authoritative for Windows PowerShell 5.1.
 
-- [ ] **Step 5: Commit only if verification required fixes**
+- [ ] **Step 5: Commit only verification fixes**
 
-If `git status --short` shows tracked fixes, stage them with:
+If `git status --short` shows tracked fixes:
 
 ```bash
 git add -u
