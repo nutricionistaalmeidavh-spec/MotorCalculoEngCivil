@@ -43,7 +43,7 @@
 
 **Interfaces:**
 - Consumes: existing `HistoryEntry`, `ExamQuestion`, `addHistoryEntry()`.
-- Produces: `HistoryEntry.topicId?: string`; `ExamQuestion.topicId: TopicIdLike`; all exam history writes persist `topicId`.
+- Produces: `HistoryEntry.topicId?: string`; `ExamTopicId`; `ExamQuestion.topicId: ExamTopicId`; all exam history writes persist `topicId`.
 
 - [ ] **Step 1: Write failing exam metadata tests**
 
@@ -68,8 +68,6 @@ describe("exam topic metadata", () => {
 ```
 
 - [ ] **Step 2: Run the focused test and confirm red**
-
-Run:
 
 ```bash
 npm test -- src/study/exam.test.ts
@@ -108,10 +106,10 @@ Do not change `DB_VERSION`, store name, key path, or index creation.
 
 - [ ] **Step 4: Add explicit exam topic IDs and one application question**
 
-Extend `ExamQuestion` in `src/study/exam.ts` with:
+In `src/study/exam.ts`, define:
 
 ```ts
-topicId:
+export type ExamTopicId =
   | "funcoes"
   | "limites"
   | "derivadas"
@@ -121,12 +119,12 @@ topicId:
   | "algebra";
 ```
 
-Assign existing questions to `limites`, `derivadas`, `integrais`, or `analise-funcoes`, and append:
+Add `topicId: ExamTopicId` to `ExamQuestion`, assign existing questions to the appropriate IDs, and append:
 
 ```ts
 {
-  id: "derivative-motion",
-  prompt: "A posição é s(t)=t³-6t²+9t. Encontre a velocidade v(t).",
+  id: "derivative-rate",
+  prompt: "A altura é modelada por h(x)=x³-6x²+9x. Encontre a taxa instantânea h′(x).",
   expression: "x^3 - 6*x^2 + 9*x",
   operation: "differentiate",
   topic: "Aplicações de derivadas",
@@ -134,8 +132,6 @@ Assign existing questions to `limites`, `derivadas`, `integrais`, or `analise-fu
   expected: "3*x^2 - 12*x + 9",
 },
 ```
-
-Use `x` because the current equivalence checker receives the app's principal variable.
 
 - [ ] **Step 5: Persist `topicId` from exam attempts**
 
@@ -149,16 +145,12 @@ inside the object passed to `buildHistoryEntry()`.
 
 - [ ] **Step 6: Run tests and commit**
 
-Run:
-
 ```bash
 npm test -- src/study/exam.test.ts
 npm run typecheck
 ```
 
 Expected: PASS.
-
-Commit:
 
 ```bash
 git add src/history/storage.ts src/study/exam.ts src/study/exam-controller.ts src/study/exam.test.ts
@@ -180,7 +172,7 @@ git commit -m "feat: add stable topic metadata"
 
 - [ ] **Step 1: Write failing topic and progress tests**
 
-Create `src/progress/model.test.ts` with fixtures using fixed timestamps:
+Create `src/progress/model.test.ts`:
 
 ```ts
 import { describe, expect, it } from "vitest";
@@ -387,7 +379,7 @@ Implement state order exactly: empty → `not_started`; mastery check; review ch
 
 - [ ] **Step 5: Add deterministic mission tests**
 
-Append tests that assert: review topics win; lower accuracy wins; more errors breaks ties; newest error breaks the next tie; otherwise least-correct studying topic; otherwise first not-started in `TOPIC_ORDER`; all mastered falls back to maintenance.
+Append concrete fixtures that assert: review topics win; lower accuracy wins; more errors breaks ties; newest error breaks the next tie; otherwise least-correct studying topic; otherwise first not-started in `TOPIC_ORDER`; all mastered falls back to maintenance.
 
 - [ ] **Step 6: Run focused and full TypeScript tests, then commit**
 
@@ -422,7 +414,7 @@ git commit -m "feat: derive study progress from history"
 Create `src/mindmap/model.test.ts`:
 
 ```ts
-import { describe, expect, it } from "vitest";
+import { expect, it } from "vitest";
 import { buildProgress } from "../progress/model";
 import { MIND_MAP_EDGES, MIND_MAP_TOPICS } from "./data";
 import { buildMindMap } from "./model";
@@ -464,7 +456,7 @@ Expected: FAIL because map files do not exist.
 
 - [ ] **Step 3: Create the static topic catalog**
 
-`src/mindmap/data.ts` must export a `MindMapTopic` interface containing `id`, `title`, `summary`, `concepts`, `formulas`, `relatedOperations`, and `practiceQuestion`, plus exactly these topic IDs: `algebra`, `funcoes`, `limites`, `derivadas`, `aplicacoes-derivadas`, `analise-funcoes`, `integrais`.
+`src/mindmap/data.ts` exports a `MindMapTopic` interface containing `id`, `title`, `summary`, `concepts`, `formulas`, `relatedOperations`, and `practiceQuestion`, plus exactly these topic IDs: `algebra`, `funcoes`, `limites`, `derivadas`, `aplicacoes-derivadas`, `analise-funcoes`, `integrais`.
 
 Define edges exactly from the spec:
 
@@ -515,22 +507,25 @@ git commit -m "feat: add calculus mind map model"
 
 - [ ] **Step 1: Write failing filter tests**
 
+Create `src/history/filter.test.ts`:
+
 ```ts
-import { describe, expect, it } from "vitest";
+import { expect, it } from "vitest";
+import type { HistoryEntry } from "./storage";
 import { filterHistoryEntries } from "./filter";
 
-const entries = [
+const entries: HistoryEntry[] = [
   { id: "1", createdAt: 1, expression: "a", operation: "limit", variable: "x", resultText: "", topicId: "limites", outcome: "incorrect" },
   { id: "2", createdAt: 2, expression: "b", operation: "differentiate", variable: "x", resultText: "", topicId: "derivadas", outcome: "incorrect" },
   { id: "3", createdAt: 3, expression: "c", operation: "limit", variable: "x", resultText: "", outcome: "correct" },
-] as const;
+];
 
 it("combines topic and outcome filters", () => {
-  expect(filterHistoryEntries([...entries], { topicId: "limites", outcome: "incorrect" }).map((entry) => entry.id)).toEqual(["1"]);
+  expect(filterHistoryEntries(entries, { topicId: "limites", outcome: "incorrect" }).map((entry) => entry.id)).toEqual(["1"]);
 });
 
 it("uses topic fallback for old entries without topicId", () => {
-  expect(filterHistoryEntries([...entries], { topicId: "limites", outcome: "all" }).map((entry) => entry.id)).toEqual(["1", "3"]);
+  expect(filterHistoryEntries(entries, { topicId: "limites", outcome: "all" }).map((entry) => entry.id)).toEqual(["1", "3"]);
 });
 ```
 
@@ -539,6 +534,8 @@ it("uses topic fallback for old entries without topicId", () => {
 ```bash
 npm test -- src/history/filter.test.ts
 ```
+
+Expected: FAIL because the filter module does not exist.
 
 - [ ] **Step 3: Implement filter helper using `resolveTopicId()`**
 
@@ -576,7 +573,7 @@ window.addEventListener("motor-history-filter", (event) => {
 });
 ```
 
-Display a clear topic filter chip/button when `topicId !== "all"`; clearing it must retain the current outcome filter.
+Display a clear topic filter chip/button when `topicId !== "all"`; clearing it retains the current outcome filter.
 
 - [ ] **Step 5: Run tests and commit**
 
@@ -585,6 +582,8 @@ npm test -- src/history/filter.test.ts
 npm test
 npm run typecheck
 ```
+
+Expected: PASS.
 
 ```bash
 git add src/history/filter.ts src/history/filter.test.ts src/history/ui.ts
@@ -604,11 +603,11 @@ git commit -m "feat: filter study history by topic"
 
 **Interfaces:**
 - Consumes: `listHistory(240)`, `buildProgress()`, `buildMindMap()`, `MIND_MAP_TOPICS`.
-- Produces: `mountProgressAndMindMap()` and DOM events `motor-practice-topic`, `motor-review-topic`; new `mindmap` main view.
+- Produces: `loadProgress()`, `renderProgressSummary(target, progress)`, `mountMindMap(container, detail)`; DOM events `motor-practice-topic`, `motor-review-topic`; new `mindmap` main view.
 
 - [ ] **Step 1: Add the third main view markup**
 
-In `src/study/shell.ts`, change the view switch to three buttons:
+In `src/study/shell.ts`, change the view switch to:
 
 ```html
 <button type="button" class="view-tab active" data-view="study" aria-pressed="true">Estudar</button>
@@ -626,15 +625,16 @@ Add `#mindmap-view` containing:
 </section>
 ```
 
-- [ ] **Step 2: Implement resilient progress UI**
+- [ ] **Step 2: Implement resilient progress loading/rendering**
 
 `src/progress/ui.ts` exports:
 
 ```ts
-export async function renderProgressSummary(target: HTMLElement): Promise<ProgressSummary | null>;
+export async function loadProgress(): Promise<ProgressSummary | null>;
+export function renderProgressSummary(target: HTMLElement, progress: ProgressSummary | null): void;
 ```
 
-On success, render overall progress, streak, assessed accuracy (`Sem questões avaliadas ainda` when null), mastered count, and mission with one CTA. On IndexedDB failure, render `Progresso local indisponível neste navegador` and return `null` without throwing.
+`loadProgress()` calls `listHistory(240)` and `buildProgress()`. It catches IndexedDB failure and returns `null`. The renderer shows overall progress, streak, assessed accuracy (`Sem questões avaliadas ainda` when null), mastered count, and mission with one CTA. For `progress === null`, render `Progresso local indisponível neste navegador` without throwing.
 
 - [ ] **Step 3: Implement semantic map UI**
 
@@ -646,15 +646,25 @@ export function mountMindMap(container: HTMLElement, detail: HTMLElement): {
 };
 ```
 
-Render HTML `<button>` nodes in pedagogical order. Render SVG edges with `aria-hidden="true"`. Every node contains its title plus visible state text (`Não iniciado`, `Em estudo`, `Revisar`, `Dominado`). If progress is unavailable, keep all structural nodes visible with an `Indisponível` supplemental message without disabling practice.
+Render HTML `<button>` nodes in pedagogical order and SVG edges with `aria-hidden="true"`. Every node contains its title plus visible state text (`Não iniciado`, `Em estudo`, `Revisar`, `Dominado`). If progress is unavailable, keep all structural nodes visible with an `Indisponível` supplemental message without disabling practice.
 
-The detail panel must expose topic summary, formulas/concepts, `X acertos · Y erros · Z práticas`, incoming/outgoing relations, recent-error count, `Praticar agora`, and conditional `Revisar meus erros`.
+The detail panel exposes topic summary, formulas/concepts, `X acertos · Y erros · Z práticas`, incoming/outgoing relations, recent-error count, `Praticar agora`, and conditional `Revisar meus erros`.
 
-- [ ] **Step 4: Wire refresh to the existing history event**
+- [ ] **Step 4: Wire one refresh pipeline to the existing history event**
 
-In `src/study/app.ts`, mount the progress/map controller after the shell. On `motor-history-updated`, re-read history, rebuild progress, and call `refresh()` without page reload.
+In `src/study/app.ts`, mount the map after the shell and use one function:
 
-Update tab logic from boolean `exam` to explicit view IDs:
+```ts
+async function refreshLearningProgress(): Promise<void> {
+  const progress = await loadProgress();
+  renderProgressSummary(progressSummary, progress);
+  mindMap.refresh(progress);
+}
+```
+
+Call it on startup and on `motor-history-updated` so history is read once per refresh and both surfaces use the same snapshot.
+
+Update tab logic to explicit view IDs:
 
 ```ts
 const views = {
@@ -670,7 +680,11 @@ Hide all except the selected view and update `aria-pressed` on all tabs.
 
 Desktop/tablet: CSS grid with positioned HTML nodes and absolute decorative SVG behind them. Mobile at `max-width: 640px`: switch `.mindmap-canvas` to a vertical grid/list; hide/replace complex edge geometry with simple connector lines; no pan/zoom container.
 
-- [ ] **Step 6: Run regression tests and commit**
+- [ ] **Step 6: Verify IndexedDB failure behavior**
+
+Temporarily make `loadProgress()`'s history call reject in a local verification branch or devtools override. Confirm the progress unavailable message appears, all map topics remain visible, and `Praticar agora` remains enabled. Restore normal code before commit.
+
+- [ ] **Step 7: Run regression tests and commit**
 
 ```bash
 npm test
@@ -702,6 +716,8 @@ git commit -m "feat: add progress dashboard and mind map"
 
 - [ ] **Step 1: Write failing context tests**
 
+Create `src/study/topic-context.test.ts`:
+
 ```ts
 import { expect, it } from "vitest";
 import { createTopicContext } from "./topic-context";
@@ -720,9 +736,13 @@ it("keeps map topic context until the seeded question is changed", () => {
 npm test -- src/study/topic-context.test.ts
 ```
 
-- [ ] **Step 3: Implement a tiny pure context helper**
+Expected: FAIL because the context module does not exist.
+
+- [ ] **Step 3: Implement the pure context helper**
 
 ```ts
+import type { TopicId } from "../progress/topics";
+
 export function createTopicContext() {
   let topicId: TopicId | null = null;
   let seededQuestion = "";
@@ -741,11 +761,17 @@ export function createTopicContext() {
 
 When `motor-practice-topic` fires, get the selected topic's `practiceQuestion`, call `context.seed(topicId, question)`, fill `#expression`, reset operation lock, switch to `study`, call existing intent sync, focus the textarea, and do not auto-run.
 
-On any user-originated `input` event whose value differs from the seeded question, clear the context.
+On a user-originated `input` event whose value differs from the seeded question, call `context.clear()` and delete `expressionInput.dataset.topicId`.
 
-Before/after a successful calculation, expose the active context to history capture with `expressionInput.dataset.topicId = context.topicIdFor(expressionInput.value) ?? ""`.
+In `runCalculation()`, immediately before `renderResult(result)`, set:
 
-In `history/ui.ts`, read that dataset field in `currentSnapshot()` and set `entry.topicId` only when non-empty.
+```ts
+expressionInput.dataset.topicId = context.topicIdFor(expressionInput.value) ?? "";
+```
+
+This ordering ensures the existing result `MutationObserver` sees the topic metadata when it captures history.
+
+In `history/ui.ts`, read `expression.dataset.topicId` in `currentSnapshot()` and set `entry.topicId` only when non-empty.
 
 - [ ] **Step 5: Wire `Revisar meus erros`**
 
@@ -757,7 +783,7 @@ window.dispatchEvent(new CustomEvent("motor-history-filter", {
 }));
 ```
 
-The map must not directly manipulate the history DOM.
+The map must not directly manipulate history rows.
 
 - [ ] **Step 6: Run all checks and commit**
 
@@ -767,6 +793,8 @@ python -m unittest discover -s tests -p "test_*.py"
 npm run typecheck
 npm run build
 ```
+
+Expected: all pass.
 
 ```bash
 git add src/study/app.ts src/study/topic-context.ts src/study/topic-context.test.ts src/history/ui.ts
@@ -798,8 +826,6 @@ Expected: TypeScript tests, SymPy tests, typecheck, and production build all pas
 
 - [ ] **Step 2: Verify five review-focus cases manually in dev mode**
 
-Run:
-
 ```bash
 npm run dev
 ```
@@ -823,8 +849,10 @@ Expected: no syntax error. GitHub Actions remains the authority for Windows Powe
 
 - [ ] **Step 5: Commit only if verification required fixes**
 
+If `git status --short` shows tracked fixes, stage them with:
+
 ```bash
-git add <only-files-changed-by-verification>
+git add -u
 git commit -m "fix: harden P2 learning progress UX"
 ```
 
