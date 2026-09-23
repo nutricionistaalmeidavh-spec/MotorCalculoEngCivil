@@ -4,7 +4,7 @@
 
 **Goal:** Add accessible, non-blocking motion and visual polish across study, mind map, progress, history, and exam flows without changing mathematical behavior or adding runtime dependencies.
 
-**Architecture:** Implement P3 as a presentation layer on top of the completed P2 DOM structure. Centralize motion timing/state classes in CSS and use only minimal TypeScript helpers where JavaScript is required to mark view/result transitions; preserve all existing functional controllers and rely on `prefers-reduced-motion` for accessibility.
+**Architecture:** Implement P3 as a presentation layer on top of the completed P2 DOM structure. Centralize timing/state classes in CSS and use minimal TypeScript helpers only to mark one-shot view/result/progress/map/exam transitions; preserve functional controllers and make reduced motion a first-class behavior.
 
 **Tech Stack:** TypeScript 7, Vitest 5, Vite 8, CSS animations/transitions, semantic HTML, existing study/mind-map/progress modules.
 
@@ -67,7 +67,7 @@ npm test -- src/ui/motion.test.ts
 
 Expected: FAIL because `src/ui/motion.ts` does not exist.
 
-- [ ] **Step 3: Implement minimal motion helpers**
+- [ ] **Step 3: Implement minimal helpers**
 
 Create `src/ui/motion.ts`:
 
@@ -108,47 +108,49 @@ const solutionWorkspace = document.querySelector(".solution-workspace");
 if (solutionWorkspace) scrollIntoViewRespectingMotion(solutionWorkspace, { block: "start" });
 ```
 
-In `src/history/ui.ts`, replace the two `scrollIntoView({ behavior: "smooth", ... })` calls used by history restore/topic filtering with `scrollIntoViewRespectingMotion(...)`.
+In `src/history/ui.ts`, replace both smooth-scroll calls used by restore/topic filtering with `scrollIntoViewRespectingMotion(...)`.
 
-- [ ] **Step 5: Run tests/typecheck and commit**
+- [ ] **Step 5: Run checks and commit**
 
 ```bash
 npm test -- src/ui/motion.test.ts
 npm run typecheck
-```
-
-Expected: PASS.
-
-```bash
 git add src/ui/motion.ts src/ui/motion.test.ts src/study/app.ts src/history/ui.ts
 git commit -m "feat: add accessible motion helpers"
 ```
 
+Expected: PASS.
+
 ---
 
-### Task 2: Add one-shot view, result, progress, and map transitions
+### Task 2: Add one-shot view/result/map/progress/exam transitions
 
 **Files:**
 - Modify: `src/study/app.ts`
+- Modify: `src/study/exam-controller.ts`
 - Modify: `src/mindmap/ui.ts`
 - Modify: `src/progress/ui.ts`
 - Modify: `src/ux.css`
 
 **Interfaces:**
-- Consumes: P2 view containers, map nodes, progress elements, `enterOnce()`.
-- Produces: one-shot CSS states `view-enter`, `result-enter`, `step-enter`, `progress-updated`, `mindmap-node-updated`.
+- Consumes: P2 view containers, result steps, map nodes/detail panel, progress meter, exam feedback, `enterOnce()`.
+- Produces: `view-enter`, `result-enter`, `step-enter`, `progress-updated`, `mindmap-node-updated`, `mindmap-detail-enter`, `exam-feedback-updated`.
 
-- [ ] **Step 1: Add explicit view transition hook**
+- [ ] **Step 1: Animate a selected view only after visibility state is correct**
 
-In the P2 view-switch function, after the selected view becomes visible:
+In the P2 view-switch function:
 
 ```ts
+for (const [name, element] of Object.entries(views)) {
+  element.hidden = name !== selectedView;
+}
+const selected = views[selectedView];
 enterOnce(selected, "view-enter");
 ```
 
-Visibility and focus changes happen before this call and do not depend on the animation class.
+Focus changes happen after visibility is set and do not depend on the animation class.
 
-- [ ] **Step 2: Animate new result content and only newly revealed steps**
+- [ ] **Step 2: Animate result and only newly revealed learning steps**
 
 After `renderResult(result)`:
 
@@ -156,7 +158,7 @@ After `renderResult(result)`:
 enterOnce(resultContent, "result-enter");
 ```
 
-When steps render, mark only first-time nodes:
+When steps are rendered:
 
 ```ts
 for (const step of learningSteps.querySelectorAll<HTMLElement>(".learning-step")) {
@@ -166,11 +168,11 @@ for (const step of learningSteps.querySelectorAll<HTMLElement>(".learning-step")
 }
 ```
 
-Preserve `data-animated` on already rendered/reused nodes so changing study mode does not replay every old step.
+Preserve the marker for already-visible steps so Learn/Solve toggles do not replay the whole stack.
 
-- [ ] **Step 3: Highlight only actual progress/map changes**
+- [ ] **Step 3: Animate only actual progress and map-state changes**
 
-In `src/progress/ui.ts`, store the previous overall percentage. After rendering a new value:
+In `src/progress/ui.ts`, retain previous overall percent:
 
 ```ts
 if (previousOverallPercent !== null && previousOverallPercent !== progress.overallPercent) {
@@ -179,7 +181,7 @@ if (previousOverallPercent !== null && previousOverallPercent !== progress.overa
 previousOverallPercent = progress.overallPercent;
 ```
 
-In `src/mindmap/ui.ts`, keep `Map<TopicId, TopicState>` from the previous refresh. For each node:
+In `src/mindmap/ui.ts`, retain previous topic states:
 
 ```ts
 const previousState = previousStates.get(node.id);
@@ -189,9 +191,29 @@ if (previousState && previousState !== node.state) {
 previousStates.set(node.id, node.state);
 ```
 
-Unchanged nodes must not animate on `motor-history-updated`.
+Unchanged nodes must not replay highlight animation on history refresh.
 
-- [ ] **Step 4: Add timing tokens and keyframes**
+- [ ] **Step 4: Animate topic-detail opening without blocking controls**
+
+At the end of the map node selection/render routine:
+
+```ts
+enterOnce(detail, "mindmap-detail-enter");
+```
+
+Buttons inside the detail panel are inserted and clickable before this call. Do not use `pointer-events: none` during the animation.
+
+- [ ] **Step 5: Animate exam correction feedback after text/class are updated**
+
+In `src/study/exam-controller.ts`, after setting `feedback.textContent` and `feedback.className`:
+
+```ts
+enterOnce(feedback, "exam-feedback-updated");
+```
+
+Correct/incorrect meaning remains in text and border/state classes; animation is supplemental.
+
+- [ ] **Step 6: Add timing tokens and one-shot keyframes**
 
 At `:root` in `src/ux.css`:
 
@@ -207,7 +229,9 @@ Add:
 ```css
 .view-enter,
 .result-enter,
-.step-enter {
+.step-enter,
+.mindmap-detail-enter,
+.exam-feedback-updated {
   animation: ui-rise var(--motion-panel) var(--motion-ease) both;
 }
 
@@ -230,34 +254,29 @@ Add:
 
 No looping animations.
 
-- [ ] **Step 5: Verify rapid view switching and unchanged refreshes**
-
-Run:
+- [ ] **Step 7: Verify rapid switching and unchanged refreshes**
 
 ```bash
 npm run dev
 ```
 
-Rapidly switch `Estudar → Mapa Mental → Modo Prova → Estudar`. Confirm exactly one view is visible and focusable. Trigger a history refresh that does not change topic states and confirm map nodes do not replay highlight animation.
+Rapidly switch `Estudar → Mapa Mental → Modo Prova → Estudar`; confirm exactly one view is visible/focusable. Trigger a history refresh without state change; confirm unchanged nodes do not re-highlight. Correct an exam question; confirm feedback text appears immediately and its short entrance animation does not prevent `Próxima questão`.
 
-- [ ] **Step 6: Run tests and commit**
+- [ ] **Step 8: Run checks and commit**
 
 ```bash
 npm test
 npm run typecheck
 npm run build
+git add src/study/app.ts src/study/exam-controller.ts src/mindmap/ui.ts src/progress/ui.ts src/ux.css
+git commit -m "feat: animate study state transitions"
 ```
 
 Expected: PASS.
 
-```bash
-git add src/study/app.ts src/mindmap/ui.ts src/progress/ui.ts src/ux.css
-git commit -m "feat: animate study state transitions"
-```
-
 ---
 
-### Task 3: Polish interactive states, hierarchy, loading, and focus
+### Task 3: Polish hierarchy, progress growth, focus, and microstates
 
 **Files:**
 - Modify: `src/study/shell.ts`
@@ -267,25 +286,35 @@ git commit -m "feat: animate study state transitions"
 - Modify: `src/ux.css`
 
 **Interfaces:**
-- Consumes: existing semantic buttons/cards and P2 state labels.
-- Produces: consistent hover/pressed/focus-visible/disabled styling and stronger empty/loading/error presentation.
+- Consumes: semantic controls/cards and P2 state labels.
+- Produces: semantic progressbar, transform-based progress growth, consistent focus-visible/hover/pressed/disabled/loading states, stronger empty/error presentation.
 
-- [ ] **Step 1: Ensure progress status is semantic and textual**
+- [ ] **Step 1: Render semantic progress with transform-based growth**
 
-Render the overall meter as:
+`src/progress/ui.ts` sets:
 
-```html
-<div class="progress-meter" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="64">
-  <span class="progress-meter-fill" style="--progress:64%"></span>
-</div>
-<span class="progress-value">64%</span>
+```ts
+const fraction = progress.overallPercent / 100;
+progressMeter.setAttribute("aria-valuemin", "0");
+progressMeter.setAttribute("aria-valuemax", "100");
+progressMeter.setAttribute("aria-valuenow", String(progress.overallPercent));
+progressFill.style.setProperty("--progress-scale", String(fraction));
+progressValue.textContent = `${progress.overallPercent}%`;
 ```
 
-The actual implementation uses the calculated value, not a hard-coded `64`. Map nodes retain visible state text inside each button.
+CSS:
+
+```css
+.progress-meter-fill {
+  transform: scaleX(var(--progress-scale, 0));
+  transform-origin: left center;
+  transition: transform var(--motion-panel) var(--motion-ease);
+}
+```
+
+The visible percentage remains alongside the meter.
 
 - [ ] **Step 2: Add consistent focus-visible treatment**
-
-In `src/ux.css`:
 
 ```css
 :where(button, input, textarea, select, summary, [tabindex]):focus-visible {
@@ -294,17 +323,15 @@ In `src/ux.css`:
 }
 ```
 
-Do not remove native outlines unless this replacement applies.
+Do not remove native outlines unless the replacement applies.
 
-- [ ] **Step 3: Normalize interactive microstates**
+- [ ] **Step 3: Normalize microinteractions**
 
-Apply transitions only to `transform`, `background`, `border-color`, and `box-shadow` using `var(--motion-fast)`. Hover may lift interactive cards/buttons by at most `2px`; `:active` returns to baseline. Disabled controls retain their dimensions and use `cursor: not-allowed`; the calculation loading state uses `cursor: progress`.
-
-Do not animate height for KaTeX/result containers.
+Use `transition` only for transform/background/border-color/box-shadow using `var(--motion-fast)`. Hover may lift interactive cards/buttons by at most `2px`; `:active` returns to baseline. Disabled controls retain dimensions and use `cursor: not-allowed`; the calculation loading state uses `cursor: progress`. Do not animate height for KaTeX/result containers.
 
 - [ ] **Step 4: Strengthen empty/error/loading visuals without changing meaning**
 
-Style these states distinctly while preserving existing copy:
+Style these states distinctly while preserving text semantics:
 
 - `.empty-state`
 - `.error`
@@ -316,15 +343,15 @@ Style these states distinctly while preserving existing copy:
 - `.feedback-incorrect`
 - `.feedback-warning`
 
-- [ ] **Step 5: Verify disabled/loading stability and keyboard order**
+Map states continue to display textual `Não iniciado`, `Em estudo`, `Revisar`, or `Dominado`; color remains supplemental.
 
-Run:
+- [ ] **Step 5: Verify loading stability and keyboard order**
 
 ```bash
 npm run dev
 ```
 
-Start a calculation and confirm the calculate button does not change width/height when disabled/loading. Keyboard-check tabs → study controls → map nodes → topic CTAs → exam controls → history controls; visible focus must remain present.
+Start a calculation and confirm the calculate button keeps width/height while loading. Keyboard-check tabs → study controls → map nodes → topic CTAs → exam controls → history controls; visible focus must remain present.
 
 - [ ] **Step 6: Run checks and commit**
 
@@ -332,14 +359,11 @@ Start a calculation and confirm the calculate button does not change width/heigh
 npm test
 npm run typecheck
 npm run build
-```
-
-Expected: PASS.
-
-```bash
 git add src/study/shell.ts src/history/ui.ts src/mindmap/ui.ts src/progress/ui.ts src/ux.css
 git commit -m "feat: polish interactive study states"
 ```
+
+Expected: PASS.
 
 ---
 
@@ -353,7 +377,7 @@ git commit -m "feat: polish interactive study states"
 - Consumes: all P3 motion classes and `scrollIntoViewRespectingMotion()`.
 - Produces: equivalent functionality with effectively instant motion under the user preference.
 
-- [ ] **Step 1: Add the reduced-motion override**
+- [ ] **Step 1: Add reduced-motion override**
 
 At the end of `src/ux.css`:
 
@@ -386,15 +410,15 @@ npm run build
 
 Expected: PASS.
 
-- [ ] **Step 3: Manually verify normal motion**
+- [ ] **Step 3: Verify normal motion**
 
-With reduced motion disabled, confirm: view switch animates once; result and newly revealed steps animate once; progress changes animate once; only changed map nodes highlight; exam feedback is readable immediately; controls stay clickable during animations.
+With reduced motion disabled, confirm: view switch animates once; result/new steps animate once; progress grows to its current value; only changed map nodes highlight; topic panel enters once; exam feedback is readable immediately; controls stay clickable throughout.
 
-- [ ] **Step 4: Manually verify reduced motion**
+- [ ] **Step 4: Verify reduced motion**
 
-With `prefers-reduced-motion: reduce`, confirm: view changes are immediate; programmatic scrolling uses `auto`; result/exam/map/progress/history updates remain visible; focus is not lost; no behavior waits for animation completion.
+With `prefers-reduced-motion: reduce`, confirm: view changes are immediate; programmatic scrolling uses `auto`; progress jumps to the value without delay; result/exam/map/history updates remain fully visible; focus is not lost; no behavior waits for animation completion.
 
-- [ ] **Step 5: Commit only if verification required fixes**
+- [ ] **Step 5: Commit only verification fixes**
 
 If `git status --short` shows tracked fixes:
 
@@ -426,7 +450,7 @@ npm run typecheck
 npm run build
 ```
 
-Expected: all checks pass.
+Expected: all PASS.
 
 - [ ] **Step 2: Verify deployment scripts match CI syntax checks**
 
