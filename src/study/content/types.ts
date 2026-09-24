@@ -34,6 +34,7 @@ export interface StudyExercise {
   options?: StudyExerciseOption[];
   correctOptionIds?: string[];
   expected?: string;
+  acceptedAnswers?: string[];
   explanation: string;
   relatedContentReason: string;
   topicIds: string[];
