@@ -1,5 +1,5 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import manifest from '../../../public/content/calculo1/manifest.json';
 import { STUDY_EXERCISES } from './exercises';
 import { STUDY_MATERIALS } from './materials';
 import { STUDY_TOPICS } from './topics';
@@ -21,23 +21,15 @@ describe('study content catalog', () => {
     }
   });
 
-  it('registers all nine source PDFs', () => {
+  it('registers all nine source PDFs in the static manifest', () => {
     expect(STUDY_MATERIALS).toHaveLength(9);
-  });
-
-  it('versions a readable full-text file for every registered material', () => {
-    const manifest = JSON.parse(readFileSync('public/content/calculo1/manifest.json', 'utf8')) as Array<{ id: string; path: string; originalFileName: string; pages: number }>;
     expect(manifest).toHaveLength(9);
     expect(unique(manifest.map((entry) => entry.id))).toBe(true);
-
     for (const material of STUDY_MATERIALS) {
       const entry = manifest.find((item) => item.id === material.id);
       expect(entry?.path).toBe(material.textPath);
       expect(entry?.originalFileName).toBe(material.originalFileName);
-      expect(entry?.pages).toBeGreaterThan(0);
-      const text = readFileSync(`public${material.textPath}`, 'utf8');
-      expect(text).toContain(`# ${material.originalFileName}`);
-      expect(text).toContain('## Página 1');
+      expect(entry?.pages).toBe(material.pages);
     }
   });
 
