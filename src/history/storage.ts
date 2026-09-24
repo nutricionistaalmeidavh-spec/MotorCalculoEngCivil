@@ -1,5 +1,5 @@
 export type HistoryOutcome = "practice" | "correct" | "incorrect";
-export type HistoryMode = "study" | "exam";
+export type HistoryMode = "study" | "exam" | "review";
 
 export interface HistoryEntry {
   id: string;
@@ -17,6 +17,10 @@ export interface HistoryEntry {
   tangentPoint?: string;
   lower?: string;
   upper?: string;
+  exerciseId?: string;
+  topicIds?: string[];
+  primaryTopicId?: string;
+  sourceMaterialId?: string;
 }
 
 const DB_NAME = "motor-calculo-eng-civil";
