@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { STUDY_EXERCISES } from './exercises';
 import { STUDY_MATERIALS } from './materials';
 import { STUDY_TOPICS } from './topics';
 
@@ -37,6 +38,28 @@ describe('study content catalog', () => {
       const text = readFileSync(`public${material.textPath}`, 'utf8');
       expect(text).toContain(`# ${material.originalFileName}`);
       expect(text).toContain('## Página 1');
+    }
+  });
+
+  it('registers the ten submitted exercises with valid content links', () => {
+    expect(STUDY_EXERCISES).toHaveLength(10);
+    expect(unique(STUDY_EXERCISES.map((exercise) => exercise.id))).toBe(true);
+    const topicIds = new Set(STUDY_TOPICS.map((topic) => topic.id));
+    const materialIds = new Set(STUDY_MATERIALS.map((material) => material.id));
+    for (const exercise of STUDY_EXERCISES) {
+      expect(topicIds.has(exercise.primaryTopicId)).toBe(true);
+      expect(exercise.topicIds).toContain(exercise.primaryTopicId);
+      expect(exercise.explanation.length).toBeGreaterThan(20);
+      expect(exercise.relatedContentReason.length).toBeGreaterThan(10);
+      for (const topicId of exercise.topicIds) expect(topicIds.has(topicId)).toBe(true);
+      for (const ref of exercise.sourceRefs) if (ref.materialId) expect(materialIds.has(ref.materialId)).toBe(true);
+      if (exercise.answerKind === 'single-choice' || exercise.answerKind === 'multi-choice') {
+        expect(exercise.options?.length).toBeGreaterThan(1);
+        const optionIds = new Set(exercise.options?.map((option) => option.id));
+        for (const correctId of exercise.correctOptionIds ?? []) expect(optionIds.has(correctId)).toBe(true);
+      } else {
+        expect(exercise.expected?.length).toBeGreaterThan(0);
+      }
     }
   });
 });
