@@ -132,10 +132,23 @@ export function mountStudyShell(actions: ActionSpec[]): void {
           <span id="exam-progress" class="exam-progress"></span>
         </div>
         <div id="exam-question-wrap">
-          <p id="exam-topic" class="exam-topic"></p><h3 id="exam-question" class="exam-question"></h3><div id="exam-hint" class="exam-hint" hidden></div>
-          <label class="exam-answer-label" for="exam-answer">Sua resposta</label><input id="exam-answer" class="exam-answer" autocomplete="off" placeholder="Digite a resposta matemática" />
+          <p id="exam-topic" class="exam-topic"></p>
+          <h3 id="exam-question" class="exam-question"></h3>
+          <div id="exam-hint" class="exam-hint" hidden></div>
+          <div id="exam-answer-wrap">
+            <label class="exam-answer-label" for="exam-answer">Sua resposta</label>
+            <input id="exam-answer" class="exam-answer" autocomplete="off" placeholder="Digite a resposta" />
+            <fieldset id="exam-options" class="exam-options" hidden><legend class="sr-only">Alternativas</legend></fieldset>
+          </div>
           <div class="exam-actions"><button id="exam-hint-button" type="button" class="secondary-button">Preciso de uma pista</button><button id="exam-check" type="button" class="calculate-button">Corrigir</button></div>
-          <div id="exam-feedback" class="exam-feedback" role="status" aria-live="polite"></div><button id="exam-next" type="button" class="secondary-button" hidden>Próxima questão</button>
+          <div id="exam-feedback" class="exam-feedback" role="status" aria-live="polite"></div>
+          <section id="exam-post-answer" class="exam-post-answer" hidden aria-label="Resolução e conteúdo relacionado">
+            <h4>Resolução</h4><p id="exam-explanation"></p>
+            <h4>Conteúdo relacionado</h4><p id="exam-related-content"></p>
+            <div id="exam-warning" class="warnings" hidden></div>
+            <button id="exam-review-topic" type="button" class="secondary-button">Revisar este conteúdo</button>
+          </section>
+          <button id="exam-next" type="button" class="secondary-button" hidden>Próxima questão</button>
         </div>
         <div id="exam-summary" class="exam-summary" hidden></div>
       </section>
