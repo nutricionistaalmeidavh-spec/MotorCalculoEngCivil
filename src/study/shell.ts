@@ -20,6 +20,7 @@ export function mountStudyShell(actions: ActionSpec[]): void {
 
       <nav class="view-switch" aria-label="Modo principal">
         <button type="button" class="view-tab active" data-view="study" aria-pressed="true">Estudar</button>
+        <button type="button" class="view-tab" data-view="review" aria-pressed="false">Revisar</button>
         <button type="button" class="view-tab" data-view="exam" aria-pressed="false">Modo Prova</button>
       </nav>
 
@@ -124,6 +125,52 @@ export function mountStudyShell(actions: ActionSpec[]): void {
             <div id="graph-legend" class="graph-legend" aria-live="polite"></div>
           </section>
         </div>
+      </section>
+
+      <section id="review-view" hidden>
+        <section class="card review-card" aria-labelledby="review-title">
+          <div class="section-heading">
+            <div><p class="step">Revisão</p><h2 id="review-title">Conteúdo ligado às suas questões</h2><p class="section-copy">Escolha um assunto para revisar a teoria, abrir o material integral e praticar as questões relacionadas.</p></div>
+          </div>
+          <div id="review-group-filter" class="review-filter" aria-label="Filtrar por macrotema">
+            <button type="button" class="secondary-button active" data-review-group="all" aria-pressed="true">Todos</button>
+            <button type="button" class="secondary-button" data-review-group="Limites" aria-pressed="false">Limites</button>
+            <button type="button" class="secondary-button" data-review-group="Continuidade" aria-pressed="false">Continuidade</button>
+            <button type="button" class="secondary-button" data-review-group="Derivadas" aria-pressed="false">Derivadas</button>
+          </div>
+          <div class="review-layout">
+            <aside id="review-topic-list" class="review-topic-list" aria-label="Tópicos de revisão"></aside>
+            <article id="review-detail" class="review-detail">
+              <p id="review-detail-group" class="exam-topic"></p>
+              <h3 id="review-detail-title">Selecione um tópico</h3>
+              <p id="review-detail-summary" class="section-copy"></p>
+              <ul id="review-essentials" class="review-essentials"></ul>
+              <div id="review-progress" class="review-progress" aria-live="polite"></div>
+              <button id="review-practice" type="button" class="calculate-button">Praticar questões deste tópico</button>
+
+              <section class="review-section" aria-labelledby="review-exercises-title">
+                <div class="review-section-heading"><h4 id="review-exercises-title">Questões relacionadas</h4>
+                  <div id="review-status-filter" class="review-filter compact" aria-label="Filtrar questões por status">
+                    <button type="button" class="secondary-button active" data-review-status="all" aria-pressed="true">Todas</button>
+                    <button type="button" class="secondary-button" data-review-status="incorrect" aria-pressed="false">Errei</button>
+                    <button type="button" class="secondary-button" data-review-status="unanswered" aria-pressed="false">Ainda não respondi</button>
+                  </div>
+                </div>
+                <div id="review-exercises" class="review-exercises"></div>
+              </section>
+
+              <section class="review-section" aria-labelledby="review-materials-title">
+                <h4 id="review-materials-title">Materiais relacionados</h4>
+                <div id="review-materials" class="review-materials"></div>
+                <div id="review-material-state" class="section-copy" aria-live="polite"></div>
+                <article id="review-material-viewer" class="review-material-viewer" hidden>
+                  <h5 id="review-material-title"></h5>
+                  <pre id="review-material-text" tabindex="0"></pre>
+                </article>
+              </section>
+            </article>
+          </div>
+        </section>
       </section>
 
       <section id="exam-view" class="card exam-card" hidden>
