@@ -1,6 +1,6 @@
-import { checkEquivalent } from "../math/engine";
-import { normalizeMathInput } from "../math/normalize";
 import { addHistoryEntry, buildHistoryEntry } from "../history/storage";
+import { checkStudyExerciseAnswer, type StudyAnswer } from "./answer-checker";
+import { getTopicById } from "./content/topics";
 import { buildExamSummary, EXAM_QUESTIONS, type ExamAttempt, type ExamQuestion } from "./exam";
 
 function get<T extends HTMLElement>(id: string): T {
@@ -9,34 +9,97 @@ function get<T extends HTMLElement>(id: string): T {
   return element as T;
 }
 
-export function mountExamController(variableInput: HTMLInputElement): void {
+function topicLabel(question: ExamQuestion): string {
+  return getTopicById(question.primaryTopicId)?.title ?? question.primaryTopicId;
+}
+
+function expectedDisplay(question: ExamQuestion): string {
+  if (question.answerKind === "single-choice" || question.answerKind === "multi-choice") {
+    const correct = new Set(question.correctOptionIds ?? []);
+    return (question.options ?? []).filter((option) => correct.has(option.id)).map((option) => option.label).join("; ");
+  }
+  return question.expected ?? "";
+}
+
+export interface ExamController {
+  startTopicExam(topicId?: string): void;
+}
+
+export function mountExamController(variableInput: HTMLInputElement): ExamController {
   const progress = get<HTMLSpanElement>("exam-progress");
   const topic = get<HTMLParagraphElement>("exam-topic");
   const questionText = get<HTMLHeadingElement>("exam-question");
   const hint = get<HTMLDivElement>("exam-hint");
   const answer = get<HTMLInputElement>("exam-answer");
+  const answerLabel = document.querySelector<HTMLLabelElement>(".exam-answer-label");
+  const options = get<HTMLFieldSetElement>("exam-options");
   const hintButton = get<HTMLButtonElement>("exam-hint-button");
   const checkButton = get<HTMLButtonElement>("exam-check");
   const feedback = get<HTMLDivElement>("exam-feedback");
+  const postAnswer = get<HTMLElement>("exam-post-answer");
+  const explanation = get<HTMLParagraphElement>("exam-explanation");
+  const relatedContent = get<HTMLParagraphElement>("exam-related-content");
+  const warning = get<HTMLDivElement>("exam-warning");
+  const reviewTopicButton = get<HTMLButtonElement>("exam-review-topic");
   const next = get<HTMLButtonElement>("exam-next");
   const questionWrap = get<HTMLDivElement>("exam-question-wrap");
   const summaryBox = get<HTMLDivElement>("exam-summary");
 
+  let questions: ExamQuestion[] = [...EXAM_QUESTIONS];
   let index = 0;
   let attempts: ExamAttempt[] = [];
   let answered = false;
 
   function current(): ExamQuestion {
-    const question = EXAM_QUESTIONS[index % EXAM_QUESTIONS.length];
+    const question = questions[index % questions.length];
     if (!question) throw new Error("Banco de questões indisponível.");
     return question;
   }
 
   function hintFor(question: ExamQuestion): string {
-    if (question.operation === "limit") return "Verifique o comportamento da expressão perto do ponto antes de substituir diretamente.";
-    if (question.operation === "differentiate") return "Identifique qual regra de derivação se aplica e simplifique só no final.";
-    if (question.operation === "integrate") return "Encontre uma primitiva e depois aplique os limites superior e inferior.";
-    return "Comece por f′(x). Pontos críticos aparecem onde f′(x)=0 ou não existe.";
+    if (question.primaryTopicId === "continuidade.funcoes-por-partes") return "Compare os limites laterais no ponto em que a lei da função muda e depois compare com o valor da função.";
+    if (question.primaryTopicId === "derivadas.implicita") return "Derive os dois membros em relação a x, lembrando que y depende de x, e então isole y′.";
+    if (question.operation === "limit") return "Verifique se a substituição direta funciona. Se surgir uma indeterminação, identifique uma transformação algébrica adequada.";
+    if (question.operation === "differentiate") return "Identifique as regras de derivação necessárias antes de simplificar.";
+    return "Identifique primeiro a definição ou propriedade central pedida no enunciado.";
+  }
+
+  function renderOptions(question: ExamQuestion): void {
+    options.replaceChildren();
+    const isChoice = question.answerKind === "single-choice" || question.answerKind === "multi-choice";
+    options.hidden = !isChoice;
+    answer.hidden = isChoice;
+    if (answerLabel) answerLabel.hidden = isChoice;
+    if (!isChoice) return;
+
+    const inputType = question.answerKind === "single-choice" ? "radio" : "checkbox";
+    for (const option of question.options ?? []) {
+      const label = document.createElement("label");
+      label.className = "exam-option";
+      const input = document.createElement("input");
+      input.type = inputType;
+      input.name = "exam-option";
+      input.value = option.id;
+      const text = document.createElement("span");
+      text.textContent = option.label;
+      label.append(input, text);
+      options.append(label);
+    }
+  }
+
+  function readAnswer(question: ExamQuestion): StudyAnswer {
+    if (question.answerKind === "single-choice") {
+      return options.querySelector<HTMLInputElement>('input[type="radio"]:checked')?.value ?? "";
+    }
+    if (question.answerKind === "multi-choice") {
+      return [...options.querySelectorAll<HTMLInputElement>('input[type="checkbox"]:checked')].map((input) => input.value);
+    }
+    return answer.value;
+  }
+
+  function disableAnswerInputs(disabled: boolean): void {
+    answer.disabled = disabled;
+    for (const input of options.querySelectorAll<HTMLInputElement>("input")) input.disabled = disabled;
   }
 
   function renderSummary(): void {
@@ -60,19 +123,26 @@ export function mountExamController(variableInput: HTMLInputElement): void {
   }
 
   function render(): void {
-    if (index >= EXAM_QUESTIONS.length) return renderSummary();
+    if (index >= questions.length) return renderSummary();
     const question = current();
     questionWrap.hidden = false;
     summaryBox.hidden = true;
-    progress.textContent = `${index + 1} / ${EXAM_QUESTIONS.length}`;
-    topic.textContent = question.topic;
+    progress.textContent = `${index + 1} / ${questions.length}`;
+    topic.textContent = topicLabel(question);
     questionText.textContent = question.prompt;
     answer.value = "";
-    answer.disabled = false;
+    answer.placeholder = question.answerKind === "expression" ? "Digite a expressão matemática" : "Digite sua resposta";
+    renderOptions(question);
+    disableAnswerInputs(false);
     hint.hidden = true;
     hint.textContent = "";
     feedback.textContent = "";
     feedback.className = "exam-feedback";
+    postAnswer.hidden = true;
+    explanation.textContent = "";
+    relatedContent.textContent = "";
+    warning.hidden = true;
+    warning.textContent = "";
     next.hidden = true;
     checkButton.disabled = false;
     answered = false;
@@ -80,36 +150,51 @@ export function mountExamController(variableInput: HTMLInputElement): void {
 
   async function check(): Promise<void> {
     if (answered) return;
-    const userAnswer = normalizeMathInput(answer.value);
-    if (!userAnswer) {
-      feedback.textContent = "Digite uma resposta antes de corrigir.";
+    const question = current();
+    const userAnswer = readAnswer(question);
+    const blank = Array.isArray(userAnswer) ? userAnswer.length === 0 : userAnswer.trim().length === 0;
+    if (blank) {
+      feedback.textContent = "Informe uma resposta antes de corrigir.";
       feedback.className = "exam-feedback feedback-warning";
       return;
     }
+
     checkButton.disabled = true;
-    const question = current();
-    const correct = await checkEquivalent(question.expected, userAnswer, variableInput.value.trim() || "x");
+    const correct = await checkStudyExerciseAnswer(question, userAnswer, variableInput.value.trim() || "x");
     answered = true;
     attempts.push({ questionId: question.id, correct });
-    answer.disabled = true;
+    disableAnswerInputs(true);
     next.hidden = false;
     feedback.textContent = correct
-      ? "Correto. Avance para a próxima questão."
-      : `Ainda não. Resposta esperada: ${question.expected}. Este tópico foi marcado para revisão.`;
+      ? "Correto. Confira a resolução e avance quando quiser."
+      : `Ainda não. Resposta esperada: ${expectedDisplay(question)}. Este conteúdo foi marcado para revisão.`;
     feedback.className = `exam-feedback ${correct ? "feedback-correct" : "feedback-incorrect"}`;
 
+    explanation.textContent = question.explanation;
+    const topicNames = question.topicIds.map((topicId) => getTopicById(topicId)?.title ?? topicId);
+    relatedContent.textContent = `${topicNames.join(" · ")}. ${question.relatedContentReason}`;
+    warning.hidden = !question.warning;
+    warning.textContent = question.warning ?? "";
+    postAnswer.hidden = false;
+
+    const printableAnswer = Array.isArray(userAnswer) ? userAnswer.join(", ") : userAnswer;
     try {
       await addHistoryEntry(buildHistoryEntry({
-        expression: question.expression,
+        expression: question.expression ?? question.prompt,
         operation: question.operation,
         variable: variableInput.value.trim() || "x",
-        resultText: correct ? `Resposta correta: ${userAnswer}` : `Sua resposta: ${userAnswer} · Esperado: ${question.expected}`,
-        topic: question.topic,
+        resultText: correct ? `Resposta correta: ${printableAnswer}` : `Sua resposta: ${printableAnswer} · Esperado: ${expectedDisplay(question)}`,
+        topic: topicLabel(question),
         outcome: correct ? "correct" : "incorrect",
         mode: "exam",
         target: question.target,
+        direction: question.direction,
         lower: question.lower,
         upper: question.upper,
+        exerciseId: question.id,
+        topicIds: question.topicIds,
+        primaryTopicId: question.primaryTopicId,
+        sourceMaterialId: question.sourceRefs.find((ref) => ref.materialId)?.materialId,
       }));
       window.dispatchEvent(new Event("motor-history-updated"));
     } catch {
@@ -117,9 +202,22 @@ export function mountExamController(variableInput: HTMLInputElement): void {
     }
   }
 
+  function startTopicExam(topicId?: string): void {
+    const filtered = topicId ? EXAM_QUESTIONS.filter((question) => question.topicIds.includes(topicId)) : EXAM_QUESTIONS;
+    questions = filtered.length ? [...filtered] : [...EXAM_QUESTIONS];
+    index = 0;
+    attempts = [];
+    render();
+  }
+
   hintButton.addEventListener("click", () => { hint.textContent = hintFor(current()); hint.hidden = false; });
   checkButton.addEventListener("click", () => void check());
-  answer.addEventListener("keydown", (event) => { if (event.key === "Enter") void check(); });
+  answer.addEventListener("keydown", (event) => { if (event.key === "Enter" && !answer.hidden) void check(); });
   next.addEventListener("click", () => { index += 1; answered = false; render(); });
+  reviewTopicButton.addEventListener("click", () => {
+    window.dispatchEvent(new CustomEvent("motor-review-topic", { detail: { topicId: current().primaryTopicId } }));
+  });
+
   render();
+  return { startTopicExam };
 }
