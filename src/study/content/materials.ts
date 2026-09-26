@@ -20,4 +20,41 @@ export const STUDY_MATERIALS: StudyMaterial[] = [
       '/content/calculo1/materials/unidade2calc2-p61-78.md',
     ],
   },
+  {
+    id: 'mod4-aula1-taxas-relacionadas', title: 'Módulo 4 — Taxas relacionadas', originalFileName: 'Slidaula1mod4cal1.pdf', pages: 7,
+    topics: ['derivadas.taxas-relacionadas','derivadas.definicao-taxa-variacao','derivadas.cadeia'],
+    textPath: '/content/calculo1/materials/mod4-aula1-taxas-relacionadas.md',
+    notes: ['Aula1mod4slidunid4.pdf é uma cópia binariamente idêntica desta fonte; o catálogo evita duplicar o mesmo conteúdo pedagógico.'],
+  },
+  {
+    id: 'mod4-aula2-pontos-criticos', title: 'Módulo 4 — Pontos críticos, máximos e mínimos', originalFileName: 'Aula2calc1mod4slid.pdf', pages: 9,
+    topics: ['derivadas.pontos-criticos-extremos','derivadas.rolle-valor-medio'],
+    textPath: '/content/calculo1/materials/mod4-aula2-pontos-criticos.md',
+  },
+  {
+    id: 'mod4-aula3-otimizacao-testes', title: 'Módulo 4 — Otimização e testes das derivadas', originalFileName: 'Aula3slidcalc1mod4.pdf', pages: 9,
+    topics: ['derivadas.crescimento-decrescimento','derivadas.teste-primeira-derivada','derivadas.teste-segunda-derivada','derivadas.concavidade-inflexao','derivadas.otimizacao'],
+    textPath: '/content/calculo1/materials/mod4-aula3-otimizacao-testes.md',
+  },
+  {
+    id: 'mod4-aula4-lhospital', title: 'Módulo 4 — Regra de L’Hospital', originalFileName: 'Slideaula4mod4cal1.pdf', pages: 8,
+    topics: ['limites.lhospital','limites.laterais','limites.no-infinito'],
+    textPath: '/content/calculo1/materials/mod4-aula4-lhospital.md',
+  },
+  {
+    id: 'mod4-aula5-encerramento', title: 'Módulo 4 — Encerramento e revisão', originalFileName: 'Aula5mod4calc1slides.pdf', pages: 9,
+    topics: ['derivadas.taxas-relacionadas','derivadas.pontos-criticos-extremos','derivadas.otimizacao','derivadas.teste-primeira-derivada','derivadas.teste-segunda-derivada','limites.lhospital'],
+    textPath: '/content/calculo1/materials/mod4-aula5-encerramento.md',
+  },
+  {
+    id: 'mod4-unidade-completa', title: 'Unidade 4 — Aplicações das Derivadas', originalFileName: 'Mod4cal1.pdf', pages: 64,
+    topics: ['derivadas.taxas-relacionadas','derivadas.pontos-criticos-extremos','derivadas.rolle-valor-medio','derivadas.crescimento-decrescimento','derivadas.teste-primeira-derivada','derivadas.teste-segunda-derivada','derivadas.concavidade-inflexao','derivadas.otimizacao','limites.lhospital'],
+    textPath: '/content/calculo1/materials/mod4-unidade-completa.md',
+    textParts: [
+      '/content/calculo1/materials/mod4-unidade-completa-p01-13.md',
+      '/content/calculo1/materials/mod4-unidade-completa-p14-29.md',
+      '/content/calculo1/materials/mod4-unidade-completa-p30-46.md',
+      '/content/calculo1/materials/mod4-unidade-completa-p47-64.md',
+    ],
+  },
 ];

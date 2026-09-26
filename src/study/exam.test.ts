@@ -2,12 +2,15 @@ import { describe, expect, it } from 'vitest';
 import { buildExamSummary, EXAM_QUESTIONS } from './exam';
 
 describe('exam helpers', () => {
-  it('uses the ten submitted exercises as the exam corpus', () => {
-    expect(EXAM_QUESTIONS).toHaveLength(10);
+  it('uses all twenty integrated exercises as the exam corpus', () => {
+    expect(EXAM_QUESTIONS).toHaveLength(20);
     const ids = new Set(EXAM_QUESTIONS.map((question) => question.id));
     expect(ids.has('limite-computadores-x9')).toBe(true);
     expect(ids.has('derivacao-implicita-circulo-tangente')).toBe(true);
     expect(ids.has('derivada-cosseno-exponencial')).toBe(true);
+    expect(ids.has('taxa-tanque-conico')).toBe(true);
+    expect(ids.has('otimizacao-caixa-papelao')).toBe(true);
+    expect(ids.has('lhospital-corrente-circuito')).toBe(true);
   });
 
   it('summarizes incorrect attempts by specific subtopic', () => {

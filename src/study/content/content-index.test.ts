@@ -8,9 +8,48 @@ function unique(values: string[]): boolean {
   return new Set(values).size === values.length;
 }
 
+const MODULE4_TOPIC_IDS = [
+  'derivadas.taxas-relacionadas',
+  'derivadas.pontos-criticos-extremos',
+  'derivadas.rolle-valor-medio',
+  'derivadas.crescimento-decrescimento',
+  'derivadas.teste-primeira-derivada',
+  'derivadas.teste-segunda-derivada',
+  'derivadas.concavidade-inflexao',
+  'derivadas.otimizacao',
+  'limites.lhospital',
+];
+
+const MODULE4_MATERIAL_IDS = [
+  'mod4-aula1-taxas-relacionadas',
+  'mod4-aula2-pontos-criticos',
+  'mod4-aula3-otimizacao-testes',
+  'mod4-aula4-lhospital',
+  'mod4-aula5-encerramento',
+  'mod4-unidade-completa',
+];
+
+const MODULE4_EXERCISE_IDS = [
+  'taxa-bola-raio',
+  'taxa-escada-base',
+  'taxa-calha-nivel',
+  'taxa-tanque-conico',
+  'otimizacao-caixa-papelao',
+  'otimizacao-lucro-maximo',
+  'maximo-minimo-x-dois-tercos',
+  'lhospital-cubica-menos-dois',
+  'lhospital-infinito-linear',
+  'lhospital-corrente-circuito',
+];
+
 describe('study content catalog', () => {
   it('uses unique topic ids', () => {
     expect(unique(STUDY_TOPICS.map((topic) => topic.id))).toBe(true);
+  });
+
+  it('registers the module 4 topics', () => {
+    const topicIds = new Set(STUDY_TOPICS.map((topic) => topic.id));
+    for (const topicId of MODULE4_TOPIC_IDS) expect(topicIds.has(topicId)).toBe(true);
   });
 
   it('uses unique material ids and valid topic references', () => {
@@ -21,9 +60,9 @@ describe('study content catalog', () => {
     }
   });
 
-  it('registers all nine source PDFs in the static manifest', () => {
-    expect(STUDY_MATERIALS).toHaveLength(9);
-    expect(manifest).toHaveLength(9);
+  it('registers the fifteen canonical source materials in the static manifest', () => {
+    expect(STUDY_MATERIALS).toHaveLength(15);
+    expect(manifest).toHaveLength(15);
     expect(unique(manifest.map((entry) => entry.id))).toBe(true);
     for (const material of STUDY_MATERIALS) {
       const entry = manifest.find((item) => item.id === material.id);
@@ -33,9 +72,17 @@ describe('study content catalog', () => {
     }
   });
 
-  it('registers the ten submitted exercises with valid content links', () => {
-    expect(STUDY_EXERCISES).toHaveLength(10);
+  it('registers all six canonical module 4 materials', () => {
+    const materialIds = new Set(STUDY_MATERIALS.map((material) => material.id));
+    for (const materialId of MODULE4_MATERIAL_IDS) expect(materialIds.has(materialId)).toBe(true);
+  });
+
+  it('registers the twenty study exercises with valid content links', () => {
+    expect(STUDY_EXERCISES).toHaveLength(20);
     expect(unique(STUDY_EXERCISES.map((exercise) => exercise.id))).toBe(true);
+    const exerciseIds = new Set(STUDY_EXERCISES.map((exercise) => exercise.id));
+    for (const exerciseId of MODULE4_EXERCISE_IDS) expect(exerciseIds.has(exerciseId)).toBe(true);
+
     const topicIds = new Set(STUDY_TOPICS.map((topic) => topic.id));
     const materialIds = new Set(STUDY_MATERIALS.map((material) => material.id));
     for (const exercise of STUDY_EXERCISES) {

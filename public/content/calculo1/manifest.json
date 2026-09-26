@@ -7,5 +7,11 @@
   {"id":"slides-unidade2","path":"/content/calculo1/materials/slides-unidade2.md","originalFileName":"SlidesUnidade2Calc1.pdf","pages":10},
   {"id":"mod3-aula3","path":"/content/calculo1/materials/mod3-aula3.md","originalFileName":"Mod3slidaula3calc1.pdf","pages":9},
   {"id":"slides-aula3-mod2","path":"/content/calculo1/materials/slides-aula3-mod2.md","originalFileName":"SlidesAula3Mod2.pdf","pages":10},
-  {"id":"unidade2calc2","path":"/content/calculo1/materials/unidade2calc2.md","originalFileName":"Unidade2calc2.pdf","pages":78,"parts":["/content/calculo1/materials/unidade2calc2-p01-20.md","/content/calculo1/materials/unidade2calc2-p21-40.md","/content/calculo1/materials/unidade2calc2-p41-60.md","/content/calculo1/materials/unidade2calc2-p61-78.md"]}
+  {"id":"unidade2calc2","path":"/content/calculo1/materials/unidade2calc2.md","originalFileName":"Unidade2calc2.pdf","pages":78,"parts":["/content/calculo1/materials/unidade2calc2-p01-20.md","/content/calculo1/materials/unidade2calc2-p21-40.md","/content/calculo1/materials/unidade2calc2-p41-60.md","/content/calculo1/materials/unidade2calc2-p61-78.md"]},
+  {"id":"mod4-aula1-taxas-relacionadas","path":"/content/calculo1/materials/mod4-aula1-taxas-relacionadas.md","originalFileName":"Slidaula1mod4cal1.pdf","pages":7},
+  {"id":"mod4-aula2-pontos-criticos","path":"/content/calculo1/materials/mod4-aula2-pontos-criticos.md","originalFileName":"Aula2calc1mod4slid.pdf","pages":9},
+  {"id":"mod4-aula3-otimizacao-testes","path":"/content/calculo1/materials/mod4-aula3-otimizacao-testes.md","originalFileName":"Aula3slidcalc1mod4.pdf","pages":9},
+  {"id":"mod4-aula4-lhospital","path":"/content/calculo1/materials/mod4-aula4-lhospital.md","originalFileName":"Slideaula4mod4cal1.pdf","pages":8},
+  {"id":"mod4-aula5-encerramento","path":"/content/calculo1/materials/mod4-aula5-encerramento.md","originalFileName":"Aula5mod4calc1slides.pdf","pages":9},
+  {"id":"mod4-unidade-completa","path":"/content/calculo1/materials/mod4-unidade-completa.md","originalFileName":"Mod4cal1.pdf","pages":64,"parts":["/content/calculo1/materials/mod4-unidade-completa-p01-13.md","/content/calculo1/materials/mod4-unidade-completa-p14-29.md","/content/calculo1/materials/mod4-unidade-completa-p30-46.md","/content/calculo1/materials/mod4-unidade-completa-p47-64.md"]}
 ]
