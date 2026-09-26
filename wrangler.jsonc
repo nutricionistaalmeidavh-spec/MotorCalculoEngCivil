@@ -9,5 +9,18 @@
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",
     "run_worker_first": ["/api/*"]
-  }
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "motor-calculo-eng-civil-db",
+      "database_id": "aa2ff145-563c-4b19-86b4-d471a743816c"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "bucket_name": "motor-calculo-eng-civil-files",
+      "binding": "FILES"
+    }
+  ]
 }

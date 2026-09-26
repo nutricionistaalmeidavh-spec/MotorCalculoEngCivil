@@ -2,6 +2,7 @@ import katex from "katex";
 import "katex/dist/katex.min.css";
 import "../styles.css";
 import "../round2.css";
+import "../review.css";
 import { initializeGraph, plotCalculation } from "../graph/graph";
 import {
   calculate,
@@ -13,6 +14,7 @@ import {
 import { normalizeMathInput } from "../math/normalize";
 import { parseQuestionInput } from "./intent";
 import { mountExamController } from "./exam-controller";
+import { mountReviewController } from "./review-controller";
 import { mountStudyShell } from "./shell";
 
 const ACTIONS: Array<{ operation: MathOperation; label: string }> = [
@@ -29,6 +31,7 @@ const ACTIONS: Array<{ operation: MathOperation; label: string }> = [
 ];
 const OPERATION_LABELS = Object.fromEntries(ACTIONS.map(({ operation, label }) => [operation, label])) as Record<MathOperation, string>;
 type StudyMode = "learn" | "solve";
+type MainView = "study" | "review" | "exam";
 
 mountStudyShell(ACTIONS);
 
@@ -68,6 +71,7 @@ const upperBound = get<HTMLInputElement>("upper-bound");
 const calculateButton = get<HTMLButtonElement>("calculate-button");
 const graphLegend = get<HTMLDivElement>("graph-legend");
 const studyView = get<HTMLElement>("study-view");
+const reviewView = get<HTMLElement>("review-view");
 const examView = get<HTMLElement>("exam-view");
 
 let selectedOperation: MathOperation = "analyze";
@@ -79,8 +83,22 @@ let visibleStepCount = 1;
 initializeGraph();
 configureParameters(selectedOperation);
 updateDetectedOperation();
-mountExamController(variableInput);
+const examController = mountExamController(variableInput);
+const reviewController = mountReviewController();
 void bootEngine();
+
+function showView(view: MainView): void {
+  studyView.hidden = view !== "study";
+  reviewView.hidden = view !== "review";
+  examView.hidden = view !== "exam";
+  for (const item of document.querySelectorAll<HTMLButtonElement>(".view-tab")) {
+    const active = item.dataset.view === view;
+    item.classList.toggle("active", active);
+    item.setAttribute("aria-pressed", String(active));
+  }
+  if (view === "exam" && !get<HTMLInputElement>("exam-answer").hidden) get<HTMLInputElement>("exam-answer").focus();
+  if (view === "review") void reviewController.refresh();
+}
 
 for (const button of document.querySelectorAll<HTMLButtonElement>(".example")) {
   button.addEventListener("click", () => {
@@ -108,18 +126,19 @@ for (const button of document.querySelectorAll<HTMLButtonElement>(".study-mode")
   });
 }
 for (const tab of document.querySelectorAll<HTMLButtonElement>(".view-tab")) {
-  tab.addEventListener("click", () => {
-    const exam = tab.dataset.view === "exam";
-    studyView.hidden = exam;
-    examView.hidden = !exam;
-    for (const item of document.querySelectorAll<HTMLButtonElement>(".view-tab")) {
-      const active = item === tab;
-      item.classList.toggle("active", active);
-      item.setAttribute("aria-pressed", String(active));
-    }
-    if (exam) get<HTMLInputElement>("exam-answer").focus();
-  });
+  tab.addEventListener("click", () => showView((tab.dataset.view ?? "study") as MainView));
 }
+
+window.addEventListener("motor-start-topic-exam", (event) => {
+  const topicId = (event as CustomEvent<{ topicId?: string }>).detail?.topicId;
+  examController.startTopicExam(topicId);
+  showView("exam");
+});
+window.addEventListener("motor-review-topic", (event) => {
+  const topicId = (event as CustomEvent<{ topicId?: string }>).detail?.topicId;
+  if (topicId) reviewController.selectTopic(topicId);
+  showView("review");
+});
 
 expressionInput.addEventListener("input", () => { operationLocked = false; syncQuestionIntent(); });
 calculateButton.addEventListener("click", () => void runCalculation());

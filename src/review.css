@@ -1,0 +1,62 @@
+.review-card { padding: clamp(18px, 4vw, 28px); }
+.review-filter { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 18px; }
+.review-filter.compact { margin: 0; }
+.review-filter .active { border-color: #60a5fa; color: #dbeafe; background: rgba(37, 99, 235, 0.18); }
+
+.review-layout { display: grid; grid-template-columns: minmax(220px, 0.7fr) minmax(0, 1.8fr); gap: 18px; align-items: start; }
+.review-topic-list { display: grid; gap: 8px; position: sticky; top: 12px; }
+.review-topic-button, .review-material-button {
+  width: 100%;
+  border: 1px solid #303a4a;
+  border-radius: 13px;
+  padding: 12px 14px;
+  color: #e5e7eb;
+  background: #0b1220;
+  text-align: left;
+  cursor: pointer;
+}
+.review-topic-button:hover, .review-topic-button:focus-visible,
+.review-material-button:hover, .review-material-button:focus-visible { border-color: #60a5fa; outline: none; }
+.review-topic-button.active { border-color: #60a5fa; background: rgba(37, 99, 235, 0.14); }
+.review-topic-button strong, .review-material-button strong { display: block; margin-bottom: 4px; }
+.review-topic-button span, .review-material-button span { display: block; color: #9ca3af; font-size: 0.78rem; line-height: 1.35; }
+
+.review-detail { min-width: 0; border: 1px solid #202938; border-radius: 16px; padding: clamp(16px, 3vw, 24px); background: rgba(9, 13, 22, 0.48); }
+.review-detail h3 { margin: 0 0 8px; font-size: 1.35rem; }
+.review-detail h4 { margin: 0; }
+.review-essentials { margin: 12px 0 16px; padding-left: 22px; color: #d1d5db; line-height: 1.55; }
+.review-essentials li + li { margin-top: 6px; }
+.review-progress { margin: 14px 0; padding: 11px 13px; border-radius: 11px; background: #0b1220; color: #bfdbfe; font-size: 0.86rem; line-height: 1.4; }
+.review-section { margin-top: 24px; padding-top: 20px; border-top: 1px solid #202938; }
+.review-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.review-exercises, .review-materials { display: grid; gap: 10px; margin-top: 12px; }
+.review-exercise-card { border: 1px solid #303a4a; border-radius: 13px; padding: 14px; background: #0b1220; }
+.review-exercise-card h5 { margin: 0 0 8px; font-size: 0.98rem; line-height: 1.45; }
+.review-exercise-card p { line-height: 1.5; }
+.review-exercise-card details { margin-top: 10px; }
+.review-exercise-card summary { color: #93c5fd; cursor: pointer; }
+.review-material-viewer { margin-top: 14px; border: 1px solid #303a4a; border-radius: 13px; overflow: hidden; background: #070b13; }
+.review-material-viewer h5 { margin: 0; padding: 12px 14px; border-bottom: 1px solid #303a4a; }
+.review-material-viewer pre { margin: 0; max-height: min(62vh, 680px); overflow: auto; padding: 16px; white-space: pre-wrap; overflow-wrap: anywhere; color: #d1d5db; font: 0.82rem/1.55 ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+.exam-options { display: grid; gap: 9px; margin: 12px 0 0; padding: 0; border: 0; }
+.exam-option { display: flex; align-items: flex-start; gap: 10px; border: 1px solid #303a4a; border-radius: 12px; padding: 11px 12px; color: #e5e7eb; background: #0b1220; cursor: pointer; line-height: 1.4; }
+.exam-option:has(input:checked) { border-color: #60a5fa; background: rgba(37, 99, 235, 0.14); }
+.exam-option input { min-height: auto; margin: 3px 0 0; }
+.exam-post-answer { margin: 16px 0; padding: 14px; border: 1px solid #303a4a; border-radius: 13px; background: #0b1220; }
+.exam-post-answer h4 { margin: 0 0 6px; }
+.exam-post-answer p { line-height: 1.55; }
+.exam-post-answer h4:not(:first-child) { margin-top: 14px; }
+
+@media (max-width: 780px) {
+  .review-layout { grid-template-columns: 1fr; }
+  .review-topic-list { position: static; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .review-section-heading { align-items: flex-start; flex-direction: column; }
+}
+
+@media (max-width: 520px) {
+  .review-topic-list { grid-template-columns: 1fr; }
+  .review-filter { overflow-x: auto; flex-wrap: nowrap; padding-bottom: 4px; }
+  .review-filter button { flex: 0 0 auto; }
+  .review-detail { padding: 14px; }
+}

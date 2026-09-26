@@ -1,0 +1,14 @@
+{
+  "sourceRepository": "nutricionistaalmeidavh-spec/utilidades",
+  "sourceBranch": "main",
+  "snapshotDate": "2026-09-21",
+  "modules": [
+    {"id":"artisys-dashboard","version":"1.0.0","sourcePath":"modules/artisys-dashboard/src/index.mjs","blobSha":"e9591c9a5511d00716bde5feb3fc301e81948c6a","license":"MIT"},
+    {"id":"artisys-pdf","version":"1.0.0","sourcePath":"modules/artisys-pdf/src/index.mjs","blobSha":"046eeaf79a1e8e419e5ec6b40168fe32b8114f37","license":"MIT"},
+    {"id":"artisys-annotations","version":"1.0.0","sourcePath":"modules/artisys-annotations/src/index.mjs","blobSha":"ea1369eae21611b68075ff44f5b45b59c7f6055a","license":"MIT"},
+    {"id":"artisys-workflows","version":"1.0.0","sourcePath":"modules/artisys-workflows/src/index.mjs","blobSha":"0535bbd6d3b56f0e56cb23c32bad3afa824a7fa0","license":"MIT"},
+    {"id":"artisys-search","version":"0.1.0","sourcePath":"modules/artisys-search/src/index.mjs","blobSha":"48292fa0f1dd25343e9e0d71e96bb376cd676d24","license":"MIT"},
+    {"id":"artisys-storage","version":"0.2.1","sourcePath":"modules/artisys-storage/src/browser.mjs","blobSha":"46064050f4ea3cd30c1148a1962bdca11077021f","license":"MIT"},
+    {"id":"artisys-pwa-runtime","version":"0.1.0","sourcePath":"modules/artisys-pwa-runtime/src/index.mjs","blobSha":"17312eae198f337b0218f1fc18517855dda08705","license":"MIT"}
+  ]
+}
