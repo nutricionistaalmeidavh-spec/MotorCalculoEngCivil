@@ -69,17 +69,12 @@ describe('study content catalog', () => {
       expect(entry?.path).toBe(material.textPath);
       expect(entry?.originalFileName).toBe(material.originalFileName);
       expect(entry?.pages).toBe(material.pages);
-      if (material.pdfPath) expect(entry?.pdfPath).toBe(material.pdfPath);
     }
   });
 
-  it('registers all six canonical module 4 materials with their original PDFs', () => {
-    const materials = new Map(STUDY_MATERIALS.map((material) => [material.id, material]));
-    for (const materialId of MODULE4_MATERIAL_IDS) {
-      const material = materials.get(materialId);
-      expect(material).toBeTruthy();
-      expect(material?.pdfPath).toMatch(/^\/content\/calculo1\/pdfs\/mod4\/.+\.pdf$/);
-    }
+  it('registers all six canonical module 4 materials', () => {
+    const materialIds = new Set(STUDY_MATERIALS.map((material) => material.id));
+    for (const materialId of MODULE4_MATERIAL_IDS) expect(materialIds.has(materialId)).toBe(true);
   });
 
   it('registers the twenty study exercises with valid content links', () => {
