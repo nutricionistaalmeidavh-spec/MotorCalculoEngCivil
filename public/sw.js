@@ -1,7 +1,8 @@
-const CACHE_NAME = "motor-calculo-v1";
+const CACHE_NAME = "motor-calculo-v2";
 const APP_SHELL = [
   "/",
   "/manifest.webmanifest",
+  "/content/calculo1/manifest.json",
   "/icon-192.png",
   "/icon-512.png",
   "/vendor/jsxgraph.css",
@@ -54,6 +55,8 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
+  // Inclui o corpus local em /content/calculo1/: após a primeira abertura,
+  // o texto integral fica disponível no cache para revisão sem rede.
   event.respondWith(
     caches.match(request).then(async (cached) => {
       if (cached) return cached;
