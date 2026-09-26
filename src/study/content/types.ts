@@ -16,7 +16,6 @@ export interface StudyMaterial {
   topics: string[];
   textPath: string;
   textParts?: string[];
-  pdfPath?: string;
   pages?: number;
   notes?: string[];
 }
