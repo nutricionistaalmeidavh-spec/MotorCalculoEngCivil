@@ -1,4 +1,4 @@
-const CACHE_NAME = "motor-calculo-v2";
+const CACHE_NAME = "motor-calculo-v3";
 const APP_SHELL = [
   "/",
   "/manifest.webmanifest",
@@ -6,6 +6,7 @@ const APP_SHELL = [
   "/icon-192.png",
   "/icon-512.png",
   "/vendor/jsxgraph.css",
+  "/study/calculo1-demo.pdf",
   "/python-packages/mpmath-1.3.0-py3-none-any.whl",
   "/python-packages/sympy-1.14.0-py3-none-any.whl",
   "/pyodide/pyodide.mjs"
@@ -55,8 +56,8 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Inclui o corpus local em /content/calculo1/: após a primeira abertura,
-  // o texto integral fica disponível no cache para revisão sem rede.
+  // Inclui o corpus local em /content/calculo1/ e o PDF da Central de Estudos:
+  // após a primeira abertura, os assets ficam disponíveis no cache para revisão sem rede.
   event.respondWith(
     caches.match(request).then(async (cached) => {
       if (cached) return cached;

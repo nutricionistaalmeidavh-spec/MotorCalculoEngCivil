@@ -1,0 +1,12 @@
+.study-hub{margin-top:1.5rem;padding:clamp(1rem,3vw,1.5rem);border:1px solid rgba(148,163,184,.22);border-radius:1.25rem;background:rgba(15,23,42,.55)}
+.study-hub-heading{margin-bottom:1rem}.study-hub-heading h2{margin:.15rem 0 .35rem;font-size:clamp(1.4rem,4vw,2rem)}
+.study-hub-heading p:last-child{margin:0;color:#cbd5e1}.study-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:1rem}
+.study-card{min-width:0;padding:1rem;border:1px solid rgba(148,163,184,.2);border-radius:1rem;background:rgba(30,41,59,.68);overflow:hidden}
+.study-card h3{margin:0 0 .65rem;font-size:1.05rem}.study-card p{overflow-wrap:anywhere}.study-card label{display:block;margin:.55rem 0 .3rem;font-size:.9rem;color:#cbd5e1}
+.study-card input[type="text"],.study-card input[type="search"],.study-card input:not([type]){box-sizing:border-box;width:100%;max-width:100%;padding:.65rem .75rem;border:1px solid rgba(148,163,184,.35);border-radius:.65rem;background:#0f172a;color:#f8fafc}
+.study-card button{max-width:100%;margin:.45rem .35rem .25rem 0;padding:.55rem .72rem;border:1px solid rgba(96,165,250,.4);border-radius:.65rem;background:#172554;color:#dbeafe;cursor:pointer}
+.study-card button:hover,.study-card button:focus-visible,.study-card button.active{background:#1d4ed8;color:white}.study-card button:disabled{opacity:.55;cursor:wait}
+.study-topic-buttons{display:flex;flex-wrap:wrap;gap:.35rem}.study-topic-detail{margin-top:.75rem;padding:.75rem;border-radius:.75rem;background:rgba(15,23,42,.72)}.study-topic-detail p{margin:.4rem 0}.study-example{color:#bfdbfe}
+#study-annotation-list,#study-search-results ul{margin:.7rem 0 0;padding-left:1.2rem}#study-annotation-list li{margin:.4rem 0;display:flex;gap:.5rem;align-items:center;justify-content:space-between}.study-muted{color:#94a3b8}
+.study-check{display:flex!important;gap:.5rem;align-items:center}.study-check input{width:auto}.study-card iframe{box-sizing:border-box;width:100%;height:300px;margin-top:.65rem;border:1px solid rgba(148,163,184,.3);border-radius:.65rem;background:white}
+@media (max-width:520px){.study-hub{padding:.8rem}.study-card{padding:.8rem}.study-card iframe{height:240px}}
